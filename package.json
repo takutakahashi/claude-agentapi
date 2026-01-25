@@ -1,0 +1,49 @@
+{
+  "name": "claude-agentapi",
+  "version": "1.0.0",
+  "description": "coder/agentapi compatible HTTP API server using Claude Agent SDK on AWS Bedrock",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "agentapi",
+    "claude",
+    "bedrock",
+    "ai-agent",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.0.0",
+    "dotenv": "^16.0.0",
+    "express": "^4.18.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.0",
+    "@types/node": "^20.0.0",
+    "@types/supertest": "^6.0.3",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@vitest/ui": "^4.0.18",
+    "c8": "^10.1.3",
+    "eslint": "^8.0.0",
+    "supertest": "^7.2.2",
+    "tsx": "^4.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^4.0.18"
+  }
+}

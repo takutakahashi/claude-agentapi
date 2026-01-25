@@ -1,0 +1,43 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Build output
+dist
+
+# Git
+.git
+.gitignore
+.github
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*.swn
+.DS_Store
+
+# Documentation
+*.md
+!README.md
+
+# Tests
+src/__tests__
+coverage
+*.test.ts
+*.test.js
+vitest.config.ts
+
+# CI/CD
+.github/workflows
+
+# Misc
+.eslintrc.json
+.tool-versions
