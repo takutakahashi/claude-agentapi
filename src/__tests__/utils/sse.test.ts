@@ -4,10 +4,10 @@ import type { Response } from 'express';
 
 describe('SSEClientImpl', () => {
   let mockResponse: Partial<Response>;
-  let setHeaderSpy: ReturnType<typeof vi.fn>;
-  let writeSpy: ReturnType<typeof vi.fn>;
-  let endSpy: ReturnType<typeof vi.fn>;
-  let onSpy: ReturnType<typeof vi.fn>;
+  let setHeaderSpy: any;
+  let writeSpy: any;
+  let endSpy: any;
+  let onSpy: any;
 
   beforeEach(() => {
     setHeaderSpy = vi.fn();
@@ -16,10 +16,10 @@ describe('SSEClientImpl', () => {
     onSpy = vi.fn();
 
     mockResponse = {
-      setHeader: setHeaderSpy,
-      write: writeSpy,
-      end: endSpy,
-      on: onSpy,
+      setHeader: setHeaderSpy as any,
+      write: writeSpy as any,
+      end: endSpy as any,
+      on: onSpy as any,
     };
   });
 
