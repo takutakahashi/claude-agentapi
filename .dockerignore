@@ -41,4 +41,3 @@ vitest.config.ts
 # Misc
 .eslintrc.json
 .tool-versions
-tsconfig.json
