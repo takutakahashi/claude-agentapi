@@ -4,9 +4,11 @@
  */
 
 /**
- * MCP Server configuration
+ * MCP Server configuration - stdio type
  */
-export interface MCPServerConfig {
+export interface MCPServerStdioConfig {
+  /** Transport type */
+  type?: 'stdio';
   /** Command to execute the MCP server */
   command: string;
   /** Arguments to pass to the command */
@@ -16,6 +18,27 @@ export interface MCPServerConfig {
   /** Whether the server is disabled */
   disabled?: boolean;
 }
+
+/**
+ * MCP Server configuration - HTTP type
+ */
+export interface MCPServerHttpConfig {
+  /** Transport type */
+  type: 'http' | 'sse';
+  /** Server URL */
+  url: string;
+  /** HTTP headers */
+  headers?: Record<string, string>;
+  /** Environment variables */
+  env?: Record<string, string>;
+  /** Whether the server is disabled */
+  disabled?: boolean;
+}
+
+/**
+ * MCP Server configuration (union type)
+ */
+export type MCPServerConfig = MCPServerStdioConfig | MCPServerHttpConfig;
 
 /**
  * MCP Servers configuration map
@@ -90,6 +113,10 @@ export interface ClaudeConfig {
   hooks?: HooksConfig;
   /** Custom command configurations */
   commands?: CommandsConfig;
+  /** Allowed tools (for MCP tool permissions) - supports wildcards like "mcp__servername__*" */
+  allowedTools?: string[];
+  /** Environment variables */
+  env?: Record<string, string>;
 }
 
 /**
@@ -137,4 +164,8 @@ export interface ResolvedConfig {
   hooks?: HooksConfig;
   /** Custom commands configuration */
   commands?: CommandsConfig;
+  /** Allowed tools (for MCP tool permissions) */
+  allowedTools?: string[];
+  /** Environment variables */
+  env?: Record<string, string>;
 }

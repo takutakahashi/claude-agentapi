@@ -1,6 +1,7 @@
 {
   "mcpServers": {
-    "example-mcp-server": {
+    "example-stdio-server": {
+      "type": "stdio",
       "command": "node",
       "args": ["/path/to/mcp-server.js"],
       "env": {
@@ -9,11 +10,35 @@
       },
       "disabled": false
     },
-    "another-server": {
+    "example-http-server": {
+      "type": "http",
+      "url": "https://api.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${API_TOKEN}"
+      },
+      "disabled": false
+    },
+    "example-sse-server": {
+      "type": "sse",
+      "url": "https://api.example.com/mcp/sse",
+      "headers": {
+        "Authorization": "Bearer ${API_TOKEN}"
+      },
+      "disabled": false
+    },
+    "disabled-server": {
       "command": "python",
       "args": ["-m", "mcp_server"],
       "disabled": true
     }
+  },
+  "allowedTools": [
+    "mcp__example-stdio-server__*",
+    "mcp__example-http-server__*",
+    "mcp__example-sse-server__query"
+  ],
+  "env": {
+    "ENABLE_TOOL_SEARCH": "auto"
   },
   "plugins": {
     "example-plugin": {

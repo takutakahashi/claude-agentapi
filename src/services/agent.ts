@@ -68,6 +68,18 @@ export class AgentService {
         queryOptions.options!.mcpServers = config.mcpServers;
       }
 
+      // Add allowed tools if configured
+      if (config.allowedTools && config.allowedTools.length > 0) {
+        logger.info(`Configuring ${config.allowedTools.length} allowed tool(s)...`);
+        queryOptions.options!.allowedTools = config.allowedTools;
+      }
+
+      // Add environment variables if configured
+      if (config.env && Object.keys(config.env).length > 0) {
+        logger.info(`Configuring ${Object.keys(config.env).length} environment variable(s)...`);
+        queryOptions.options!.env = config.env;
+      }
+
       // Add hooks if configured
       if (config.hooks && Object.keys(config.hooks).length > 0) {
         logger.info(`Configuring ${Object.keys(config.hooks).length} hook(s)...`);
@@ -170,6 +182,12 @@ export class AgentService {
         this.recordResultMetrics(msg);
       }
 
+      // Handle system messages (especially init messages for MCP server status)
+      if (msg.type === 'system') {
+        await this.handleSystemMessage(msg);
+        return;
+      }
+
       // Handle different message types
       if (msg.type === 'assistant') {
         // Extract text content
@@ -220,6 +238,31 @@ export class AgentService {
       }
     } catch (error) {
       logger.error('Error processing SDK message:', error);
+    }
+  }
+
+  private async handleSystemMessage(msg: { type: 'system'; subtype?: string; [key: string]: unknown }): Promise<void> {
+    if (msg.subtype === 'init') {
+      logger.info('System init message received');
+
+      // Check MCP server connection status
+      if ('mcp_servers' in msg && Array.isArray(msg.mcp_servers)) {
+        const mcpServers = msg.mcp_servers as Array<{
+          name: string;
+          status: string;
+          error?: string;
+        }>;
+
+        for (const server of mcpServers) {
+          if (server.status === 'connected') {
+            logger.info(`✓ MCP server '${server.name}' connected successfully`);
+          } else if (server.status === 'failed') {
+            logger.error(`✗ MCP server '${server.name}' failed to connect${server.error ? `: ${server.error}` : ''}`);
+          } else {
+            logger.warn(`⚠ MCP server '${server.name}' status: ${server.status}`);
+          }
+        }
+      }
     }
   }
 

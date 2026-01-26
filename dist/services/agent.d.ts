@@ -11,6 +11,7 @@ export declare class AgentService {
     private processQuery;
     sendMessage(content: string): Promise<void>;
     private processSDKMessage;
+    private handleSystemMessage;
     private handleToolUse;
     private formatToolUse;
     private formatQuestion;
