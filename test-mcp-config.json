@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "test-server": {
+      "type": "http",
+      "url": "https://code.claude.com/docs/mcp"
+    }
+  },
+  "allowedTools": ["mcp__test-server__*"]
+}

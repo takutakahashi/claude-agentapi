@@ -28,11 +28,13 @@ describe('loadClaudeConfig with --mcp-config', () => {
 
   it('should load MCP config from JSON string', async () => {
     const testMcpConfig = {
-      'test-server': {
-        command: 'node',
-        args: ['server.js'],
-        env: {
-          API_KEY: 'test-key'
+      mcpServers: {
+        'test-server': {
+          command: 'node',
+          args: ['server.js'],
+          env: {
+            API_KEY: 'test-key'
+          }
         }
       }
     };
@@ -49,9 +51,11 @@ describe('loadClaudeConfig with --mcp-config', () => {
 
   it('should load MCP config from file path', async () => {
     const testMcpConfig = {
-      'file-server': {
-        command: 'python',
-        args: ['server.py']
+      mcpServers: {
+        'file-server': {
+          command: 'python',
+          args: ['server.py']
+        }
       }
     };
 
