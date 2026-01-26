@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { loadClaudeConfig } from '../../utils/config.js';
 import { writeFile, unlink, mkdir } from 'fs/promises';
 import { join } from 'path';
