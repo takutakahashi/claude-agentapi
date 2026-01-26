@@ -77,6 +77,11 @@ export class AgentService {
                 logger.info(`Configuring ${config.sdkPlugins.length} plugin(s) from settings.json...`);
                 queryOptions.options.plugins = config.sdkPlugins;
             }
+            // Add setting sources for CLAUDE.md loading
+            if (config.settingSources && config.settingSources.length > 0) {
+                logger.info(`Configuring setting sources: ${config.settingSources.join(', ')}...`);
+                queryOptions.options.settingSources = config.settingSources;
+            }
             // Create input stream manager
             this.inputStreamManager = new InputStreamManager();
             // Create query with streaming input

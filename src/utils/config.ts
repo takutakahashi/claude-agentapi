@@ -1,7 +1,7 @@
 import { readFile, access, stat } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
-import type { ClaudeConfig, ResolvedConfig, MCPServersConfig, PluginsConfig, ClaudeSettings, SdkPluginConfig } from '../types/config.js';
+import type { ClaudeConfig, ResolvedConfig, MCPServersConfig, PluginsConfig, ClaudeSettings, SdkPluginConfig, SettingSource } from '../types/config.js';
 import { logger } from './logger.js';
 
 /**
@@ -314,6 +314,22 @@ export async function resolveConfig(): Promise<ResolvedConfig> {
   // Resolve SDK plugins from settings.json
   const sdkPlugins = await resolvePluginsFromSettings(settings);
 
+  // Determine setting sources for loading CLAUDE.md files
+  // Default: ['user', 'project'] to enable CLAUDE.md loading
+  let settingSources: SettingSource[] = ['user', 'project'];
+
+  // Allow override via environment variable (comma-separated)
+  if (process.env.CLAUDE_SETTING_SOURCES) {
+    const sources = process.env.CLAUDE_SETTING_SOURCES.split(',').map(s => s.trim()) as SettingSource[];
+    // Validate sources
+    const validSources = sources.filter(s => ['user', 'project', 'local'].includes(s));
+    if (validSources.length > 0) {
+      settingSources = validSources;
+    } else {
+      logger.warn(`Invalid CLAUDE_SETTING_SOURCES: ${process.env.CLAUDE_SETTING_SOURCES}. Using default: user,project`);
+    }
+  }
+
   const resolved: ResolvedConfig = {
     workingDirectory,
     permissionMode,
@@ -324,12 +340,14 @@ export async function resolveConfig(): Promise<ResolvedConfig> {
     commands: claudeConfig.commands,
     allowedTools: claudeConfig.allowedTools,
     env: claudeConfig.env,
+    settingSources,
   };
 
   // Log configuration summary
   logger.info('Configuration resolved:');
   logger.info(`  Working directory: ${resolved.workingDirectory}`);
   logger.info(`  Permission mode: ${resolved.permissionMode}`);
+  logger.info(`  Setting sources: ${resolved.settingSources?.join(', ') || 'none'} (CLAUDE.md enabled: ${resolved.settingSources?.includes('project') ? 'yes' : 'no'})`);
 
   if (mcpServers && Object.keys(mcpServers).length > 0) {
     logger.info(`  MCP servers: ${Object.keys(mcpServers).join(', ')}`);
