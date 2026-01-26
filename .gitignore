@@ -2,7 +2,7 @@
 node_modules/
 
 # Build output
-dist/
+dist/__tests__/
 
 # Environment variables
 .env
