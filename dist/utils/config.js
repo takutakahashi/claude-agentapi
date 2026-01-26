@@ -140,6 +140,20 @@ function mergeConfigs(configs) {
                 ...config.commands,
             };
         }
+        // Merge allowedTools (concatenate arrays)
+        if (config.allowedTools) {
+            merged.allowedTools = [
+                ...(merged.allowedTools || []),
+                ...config.allowedTools,
+            ];
+        }
+        // Merge env
+        if (config.env) {
+            merged.env = {
+                ...merged.env,
+                ...config.env,
+            };
+        }
     }
     return merged;
 }
@@ -265,6 +279,8 @@ export async function resolveConfig() {
         sdkPlugins: sdkPlugins.length > 0 ? sdkPlugins : undefined,
         hooks: claudeConfig.hooks,
         commands: claudeConfig.commands,
+        allowedTools: claudeConfig.allowedTools,
+        env: claudeConfig.env,
     };
     // Log configuration summary
     logger.info('Configuration resolved:');

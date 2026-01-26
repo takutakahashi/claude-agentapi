@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { loadClaudeConfig } from '../../utils/config.js';
+import type { MCPServerStdioConfig } from '../../types/config.js';
 import { writeFile, unlink, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -42,7 +43,8 @@ describe('loadClaudeConfig with --mcp-config', () => {
 
     expect(config.mcpServers).toBeDefined();
     expect(config.mcpServers?.['test-server']).toBeDefined();
-    expect(config.mcpServers?.['test-server'].command).toBe('node');
+    const server = config.mcpServers?.['test-server'] as MCPServerStdioConfig;
+    expect(server.command).toBe('node');
   });
 
   it('should load MCP config from file path', async () => {
@@ -60,7 +62,8 @@ describe('loadClaudeConfig with --mcp-config', () => {
 
     expect(config.mcpServers).toBeDefined();
     expect(config.mcpServers?.['file-server']).toBeDefined();
-    expect(config.mcpServers?.['file-server'].command).toBe('python');
+    const server = config.mcpServers?.['file-server'] as MCPServerStdioConfig;
+    expect(server.command).toBe('python');
   });
 
   it('should return empty config when --mcp-config is not provided', async () => {
