@@ -3,14 +3,21 @@ import { z } from 'zod';
 // API Types based on coder/agentapi specification
 
 export const MessageSchema = z.object({
-  id: z.string(),
-  role: z.enum(['user', 'assistant']),
+  id: z.number(),
+  role: z.enum(['user', 'assistant', 'agent']),
   content: z.string(),
   time: z.string(), // ISO 8601 timestamp
   type: z.enum(['normal', 'question', 'plan']).optional(),
 });
 
 export type Message = z.infer<typeof MessageSchema>;
+
+export const MessagesResponseBodySchema = z.object({
+  $schema: z.string().optional(),
+  messages: z.array(MessageSchema),
+});
+
+export type MessagesResponseBody = z.infer<typeof MessagesResponseBodySchema>;
 
 export const PostMessageRequestSchema = z.object({
   content: z.string(),

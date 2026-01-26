@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   MessageSchema,
+  MessagesResponseBodySchema,
   PostMessageRequestSchema,
   PostMessageResponseSchema,
   StatusResponseSchema,
@@ -11,7 +12,7 @@ describe('API Types', () => {
   describe('MessageSchema', () => {
     it('should validate a valid message', () => {
       const validMessage = {
-        id: 'msg_1',
+        id: 0,
         role: 'user',
         content: 'Hello',
         time: '2024-01-01T00:00:00.000Z',
@@ -23,7 +24,7 @@ describe('API Types', () => {
 
     it('should validate message with type', () => {
       const validMessage = {
-        id: 'msg_1',
+        id: 1,
         role: 'assistant',
         content: 'Response',
         time: '2024-01-01T00:00:00.000Z',
@@ -34,9 +35,21 @@ describe('API Types', () => {
       expect(result.success).toBe(true);
     });
 
+    it('should validate agent role', () => {
+      const validMessage = {
+        id: 2,
+        role: 'agent',
+        content: 'Agent response',
+        time: '2024-01-01T00:00:00.000Z',
+      };
+
+      const result = MessageSchema.safeParse(validMessage);
+      expect(result.success).toBe(true);
+    });
+
     it('should reject invalid role', () => {
       const invalidMessage = {
-        id: 'msg_1',
+        id: 0,
         role: 'invalid',
         content: 'Hello',
         time: '2024-01-01T00:00:00.000Z',
@@ -48,7 +61,7 @@ describe('API Types', () => {
 
     it('should reject missing required fields', () => {
       const invalidMessage = {
-        id: 'msg_1',
+        id: 0,
         role: 'user',
       };
 
@@ -169,6 +182,56 @@ describe('API Types', () => {
 
       const result = ProblemJsonSchema.safeParse(validProblem);
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe('MessagesResponseBodySchema', () => {
+    it('should validate messages response with schema', () => {
+      const validResponse = {
+        $schema: 'https://10.42.2.198:9000/schemas/MessagesResponseBody.json',
+        messages: [
+          {
+            id: 0,
+            content: 'Test message',
+            role: 'agent',
+            time: '2026-01-26T07:56:36.432498007Z',
+          },
+          {
+            id: 1,
+            content: 'User message',
+            role: 'user',
+            time: '2026-01-26T07:56:40.357019866Z',
+          },
+        ],
+      };
+
+      const result = MessagesResponseBodySchema.safeParse(validResponse);
+      expect(result.success).toBe(true);
+    });
+
+    it('should validate messages response without schema', () => {
+      const validResponse = {
+        messages: [
+          {
+            id: 0,
+            content: 'Test message',
+            role: 'agent',
+            time: '2026-01-26T07:56:36.432498007Z',
+          },
+        ],
+      };
+
+      const result = MessagesResponseBodySchema.safeParse(validResponse);
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject invalid messages array', () => {
+      const invalidResponse = {
+        messages: 'not an array',
+      };
+
+      const result = MessagesResponseBodySchema.safeParse(invalidResponse);
+      expect(result.success).toBe(false);
     });
   });
 });

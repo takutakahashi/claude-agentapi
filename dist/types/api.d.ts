@@ -1,24 +1,65 @@
 import { z } from 'zod';
 export declare const MessageSchema: z.ZodObject<{
-    id: z.ZodString;
-    role: z.ZodEnum<["user", "assistant"]>;
+    id: z.ZodNumber;
+    role: z.ZodEnum<["user", "assistant", "agent"]>;
     content: z.ZodString;
     time: z.ZodString;
     type: z.ZodOptional<z.ZodEnum<["normal", "question", "plan"]>>;
 }, "strip", z.ZodTypeAny, {
-    id: string;
-    role: "user" | "assistant";
+    id: number;
+    role: "user" | "assistant" | "agent";
     content: string;
     time: string;
     type?: "normal" | "question" | "plan" | undefined;
 }, {
-    id: string;
-    role: "user" | "assistant";
+    id: number;
+    role: "user" | "assistant" | "agent";
     content: string;
     time: string;
     type?: "normal" | "question" | "plan" | undefined;
 }>;
 export type Message = z.infer<typeof MessageSchema>;
+export declare const MessagesResponseBodySchema: z.ZodObject<{
+    $schema: z.ZodOptional<z.ZodString>;
+    messages: z.ZodArray<z.ZodObject<{
+        id: z.ZodNumber;
+        role: z.ZodEnum<["user", "assistant", "agent"]>;
+        content: z.ZodString;
+        time: z.ZodString;
+        type: z.ZodOptional<z.ZodEnum<["normal", "question", "plan"]>>;
+    }, "strip", z.ZodTypeAny, {
+        id: number;
+        role: "user" | "assistant" | "agent";
+        content: string;
+        time: string;
+        type?: "normal" | "question" | "plan" | undefined;
+    }, {
+        id: number;
+        role: "user" | "assistant" | "agent";
+        content: string;
+        time: string;
+        type?: "normal" | "question" | "plan" | undefined;
+    }>, "many">;
+}, "strip", z.ZodTypeAny, {
+    messages: {
+        id: number;
+        role: "user" | "assistant" | "agent";
+        content: string;
+        time: string;
+        type?: "normal" | "question" | "plan" | undefined;
+    }[];
+    $schema?: string | undefined;
+}, {
+    messages: {
+        id: number;
+        role: "user" | "assistant" | "agent";
+        content: string;
+        time: string;
+        type?: "normal" | "question" | "plan" | undefined;
+    }[];
+    $schema?: string | undefined;
+}>;
+export type MessagesResponseBody = z.infer<typeof MessagesResponseBodySchema>;
 export declare const PostMessageRequestSchema: z.ZodObject<{
     content: z.ZodString;
     type: z.ZodEnum<["user", "raw"]>;

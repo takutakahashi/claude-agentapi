@@ -21,19 +21,22 @@ describe('GET /messages', () => {
     const response = await request(app).get('/messages');
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual([]);
+    expect(response.body).toEqual({
+      $schema: 'https://10.42.2.198:9000/schemas/MessagesResponseBody.json',
+      messages: [],
+    });
   });
 
   it('should return message history', async () => {
     const mockMessages: Message[] = [
       {
-        id: 'msg_1',
+        id: 0,
         role: 'user',
         content: 'Hello',
         time: '2024-01-01T00:00:00.000Z',
       },
       {
-        id: 'msg_2',
+        id: 1,
         role: 'assistant',
         content: 'Hi there!',
         time: '2024-01-01T00:00:01.000Z',
@@ -45,7 +48,10 @@ describe('GET /messages', () => {
     const response = await request(app).get('/messages');
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual(mockMessages);
+    expect(response.body).toEqual({
+      $schema: 'https://10.42.2.198:9000/schemas/MessagesResponseBody.json',
+      messages: mockMessages,
+    });
   });
 
   it('should call agentService.getMessages', async () => {
