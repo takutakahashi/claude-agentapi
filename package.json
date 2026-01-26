@@ -12,6 +12,9 @@
     "bin",
     ".env.example"
   ],
+  "trustedDependencies": [
+    "@takutakahashi/claude-agentapi"
+  ],
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc",
