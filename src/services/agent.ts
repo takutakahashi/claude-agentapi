@@ -45,6 +45,20 @@ export class AgentService {
         sessionConfig.plugins = config.plugins;
       }
 
+      // Add hooks if configured
+      if (config.hooks && Object.keys(config.hooks).length > 0) {
+        logger.info('Configuring hooks...');
+        // @ts-expect-error - hooks may not be in the type definition yet
+        sessionConfig.hooks = config.hooks;
+      }
+
+      // Add commands if configured
+      if (config.commands && Object.keys(config.commands).length > 0) {
+        logger.info('Configuring commands...');
+        // @ts-expect-error - commands may not be in the type definition yet
+        sessionConfig.commands = config.commands;
+      }
+
       // Create session with the resolved configuration
       this.session = await unstable_v2_createSession(sessionConfig);
 

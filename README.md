@@ -145,6 +145,18 @@ See `.claude/config.json.example` for a complete example.
   - `enabled`: Whether the plugin is enabled
   - `config`: Plugin-specific configuration object
 
+- **`hooks`**: Hook configurations for executing commands at specific events
+  - `command`: Command to execute when the hook is triggered
+  - `args`: Array of command-line arguments
+  - `env`: Environment variables for the hook process
+  - Common hooks: `user-prompt-submit-hook`, `tool-call-hook`
+
+- **`commands`**: Custom command definitions
+  - `command`: Command to execute
+  - `args`: Array of command-line arguments
+  - `env`: Environment variables for the command process
+  - `description`: Description of what the command does
+
 ### Environment Variables
 
 Create a `.env` file based on `.env.example`:
@@ -434,6 +446,63 @@ Plugins extend Claude's functionality with additional capabilities. Configure pl
 ```
 
 **Note:** The `skills` key is an alias for `plugins` and works identically.
+
+### Hooks
+
+Hooks allow you to execute custom commands when specific events occur during agent operation. Configure hooks in `.claude/config.json` under the `hooks` key.
+
+**Example hook configuration:**
+
+```json
+{
+  "hooks": {
+    "user-prompt-submit-hook": {
+      "command": "bash",
+      "args": ["-c", "echo 'User prompt submitted'"],
+      "env": {
+        "HOOK_TYPE": "user-prompt-submit"
+      }
+    },
+    "tool-call-hook": {
+      "command": "node",
+      "args": ["/path/to/tool-call-logger.js"]
+    }
+  }
+}
+```
+
+**Common hook types:**
+- `user-prompt-submit-hook`: Triggered when a user submits a prompt
+- `tool-call-hook`: Triggered when the agent calls a tool
+- And more depending on Claude Agent SDK support
+
+### Custom Commands
+
+Define custom commands that can be invoked during agent operation. Configure commands in `.claude/config.json` under the `commands` key.
+
+**Example command configuration:**
+
+```json
+{
+  "commands": {
+    "deploy": {
+      "command": "bash",
+      "args": ["-c", "npm run deploy"],
+      "description": "Deploy the application to production",
+      "env": {
+        "NODE_ENV": "production"
+      }
+    },
+    "test": {
+      "command": "npm",
+      "args": ["test"],
+      "description": "Run the test suite"
+    }
+  }
+}
+```
+
+Commands can be invoked by the agent or used for custom workflows within your application.
 
 ## Special Features
 

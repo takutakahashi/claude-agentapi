@@ -102,6 +102,22 @@ function mergeConfigs(configs: ClaudeConfig[]): ClaudeConfig {
         ...config.skills,
       };
     }
+
+    // Merge hooks
+    if (config.hooks) {
+      merged.hooks = {
+        ...merged.hooks,
+        ...config.hooks,
+      };
+    }
+
+    // Merge commands
+    if (config.commands) {
+      merged.commands = {
+        ...merged.commands,
+        ...config.commands,
+      };
+    }
   }
 
   return merged;
@@ -146,6 +162,8 @@ export async function resolveConfig(): Promise<ResolvedConfig> {
     permissionMode,
     mcpServers,
     plugins,
+    hooks: claudeConfig.hooks,
+    commands: claudeConfig.commands,
   };
 
   // Log configuration summary
@@ -163,6 +181,18 @@ export async function resolveConfig(): Promise<ResolvedConfig> {
     logger.info(`  Plugins: ${Object.keys(plugins).join(', ')}`);
   } else {
     logger.info('  Plugins: none');
+  }
+
+  if (resolved.hooks && Object.keys(resolved.hooks).length > 0) {
+    logger.info(`  Hooks: ${Object.keys(resolved.hooks).join(', ')}`);
+  } else {
+    logger.info('  Hooks: none');
+  }
+
+  if (resolved.commands && Object.keys(resolved.commands).length > 0) {
+    logger.info(`  Commands: ${Object.keys(resolved.commands).join(', ')}`);
+  } else {
+    logger.info('  Commands: none');
   }
 
   return resolved;

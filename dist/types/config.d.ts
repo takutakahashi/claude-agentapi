@@ -33,6 +33,40 @@ export interface PluginConfig {
  */
 export type PluginsConfig = Record<string, PluginConfig>;
 /**
+ * Hook configuration
+ */
+export interface HookConfig {
+    /** Command to execute */
+    command: string;
+    /** Arguments to pass to the command */
+    args?: string[];
+    /** Environment variables for the hook process */
+    env?: Record<string, string>;
+}
+/**
+ * Hooks configuration map
+ * Hooks are executed at specific events (e.g., user-prompt-submit-hook, tool-call-hook)
+ */
+export type HooksConfig = Record<string, HookConfig>;
+/**
+ * Custom command configuration
+ */
+export interface CommandConfig {
+    /** Command to execute */
+    command: string;
+    /** Arguments to pass to the command */
+    args?: string[];
+    /** Environment variables for the command process */
+    env?: Record<string, string>;
+    /** Description of what the command does */
+    description?: string;
+}
+/**
+ * Commands configuration map
+ * Custom commands that can be invoked (e.g., /deploy, /test)
+ */
+export type CommandsConfig = Record<string, CommandConfig>;
+/**
  * Main Claude configuration structure
  * Compatible with Claude Code's .claude/config.json
  */
@@ -43,6 +77,10 @@ export interface ClaudeConfig {
     plugins?: PluginsConfig;
     /** Skills configurations (alias for plugins) */
     skills?: PluginsConfig;
+    /** Hook configurations */
+    hooks?: HooksConfig;
+    /** Custom command configurations */
+    commands?: CommandsConfig;
 }
 /**
  * Merged configuration with environment variable overrides
@@ -56,5 +94,9 @@ export interface ResolvedConfig {
     mcpServers?: MCPServersConfig;
     /** Plugins/skills configuration */
     plugins?: PluginsConfig;
+    /** Hooks configuration */
+    hooks?: HooksConfig;
+    /** Custom commands configuration */
+    commands?: CommandsConfig;
 }
 //# sourceMappingURL=config.d.ts.map

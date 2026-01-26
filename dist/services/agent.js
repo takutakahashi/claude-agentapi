@@ -24,6 +24,7 @@ export class AgentService {
             if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
                 logger.info('Configuring MCP servers...');
                 // Convert our MCPServersConfig to the format expected by the SDK
+                // @ts-expect-error - mcpServers may not be in the type definition yet
                 sessionConfig.mcpServers = config.mcpServers;
             }
             // Add plugins/skills if configured
@@ -32,6 +33,18 @@ export class AgentService {
                 // The SDK may have a plugins parameter - we'll pass it through
                 // @ts-expect-error - plugins may not be in the type definition yet
                 sessionConfig.plugins = config.plugins;
+            }
+            // Add hooks if configured
+            if (config.hooks && Object.keys(config.hooks).length > 0) {
+                logger.info('Configuring hooks...');
+                // @ts-expect-error - hooks may not be in the type definition yet
+                sessionConfig.hooks = config.hooks;
+            }
+            // Add commands if configured
+            if (config.commands && Object.keys(config.commands).length > 0) {
+                logger.info('Configuring commands...');
+                // @ts-expect-error - commands may not be in the type definition yet
+                sessionConfig.commands = config.commands;
             }
             // Create session with the resolved configuration
             this.session = await unstable_v2_createSession(sessionConfig);

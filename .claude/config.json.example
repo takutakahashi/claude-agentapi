@@ -31,5 +31,33 @@
         "customOption": "customValue"
       }
     }
+  },
+  "hooks": {
+    "user-prompt-submit-hook": {
+      "command": "bash",
+      "args": ["-c", "echo 'User prompt submitted'"],
+      "env": {
+        "HOOK_TYPE": "user-prompt-submit"
+      }
+    },
+    "tool-call-hook": {
+      "command": "node",
+      "args": ["/path/to/tool-call-logger.js"]
+    }
+  },
+  "commands": {
+    "deploy": {
+      "command": "bash",
+      "args": ["-c", "npm run deploy"],
+      "description": "Deploy the application to production",
+      "env": {
+        "NODE_ENV": "production"
+      }
+    },
+    "test": {
+      "command": "npm",
+      "args": ["test"],
+      "description": "Run the test suite"
+    }
   }
 }
