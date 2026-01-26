@@ -8,7 +8,7 @@ import { logger } from './logger.js';
  * Load MCP config from --mcp-config option
  * Supports both JSON string and file path
  */
-async function loadMcpConfigFromOption(): Promise<MCPServersConfig | null> {
+async function loadMcpConfigFromOption(): Promise<ClaudeConfig | null> {
   const mcpConfigOption = process.env.CLAUDE_MCP_CONFIG;
   if (!mcpConfigOption) {
     return null;
@@ -19,13 +19,13 @@ async function loadMcpConfigFromOption(): Promise<MCPServersConfig | null> {
     try {
       const parsed = JSON.parse(mcpConfigOption);
       logger.info('Loaded MCP config from --mcp-config (JSON string)');
-      return parsed as MCPServersConfig;
+      return parsed as ClaudeConfig;
     } catch {
       // If not valid JSON, try as file path
       const content = await readFile(mcpConfigOption, 'utf-8');
       const parsed = JSON.parse(content);
       logger.info(`Loaded MCP config from --mcp-config (file): ${mcpConfigOption}`);
-      return parsed as MCPServersConfig;
+      return parsed as ClaudeConfig;
     }
   } catch (error) {
     logger.error(`Failed to load MCP config from --mcp-config: ${error}`);
@@ -77,7 +77,7 @@ export async function loadClaudeConfig(workingDirectory?: string): Promise<Claud
   // 4. Load MCP config from --mcp-config option (highest priority)
   const mcpConfigFromOption = await loadMcpConfigFromOption();
   if (mcpConfigFromOption) {
-    configs.push({ mcpServers: mcpConfigFromOption });
+    configs.push(mcpConfigFromOption);
   }
 
   // Merge all configs (later configs override earlier ones)

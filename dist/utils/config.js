@@ -71,7 +71,7 @@ export async function loadClaudeConfig(workingDirectory) {
     // 4. Load MCP config from --mcp-config option (highest priority)
     const mcpConfigFromOption = await loadMcpConfigFromOption();
     if (mcpConfigFromOption) {
-        configs.push({ mcpServers: mcpConfigFromOption });
+        configs.push(mcpConfigFromOption);
     }
     // Merge all configs (later configs override earlier ones)
     return mergeConfigs(configs);
