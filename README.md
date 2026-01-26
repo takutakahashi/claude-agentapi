@@ -15,6 +15,7 @@ This project implements a server compatible with the [coder/agentapi](https://gi
 - ✅ **Claude Code compatible configuration** (`.claude/config.json`)
 - ✅ **MCP (Model Context Protocol) servers support**
 - ✅ **Plugin marketplace support**
+- ✅ **Prometheus metrics export** (Claude Code compatible)
 - ✅ Server-Sent Events (SSE) for real-time updates
 - ✅ Multi-turn conversation support
 - ✅ AskUserQuestion and ExitPlanMode tool handling
@@ -189,6 +190,10 @@ Use either API Key or OAuth Token (not both):
 - `default` - Standard permission checks with user prompts for confirmations
 - `acceptEdits` - Automatically approve file edits (still prompts for other operations)
 - `bypassPermissions` - Skip all permission checks (⚠️ use with extreme caution)
+
+#### Telemetry Configuration
+- `CLAUDE_CODE_ENABLE_TELEMETRY` - Enable OpenTelemetry metrics export (set to `1` to enable)
+- `PROMETHEUS_PORT` - Prometheus metrics server port (default: 9464)
 
 #### Other Configuration
 - `DEBUG` - Enable debug logging (default: false)
@@ -503,6 +508,78 @@ Define custom commands that can be invoked during agent operation. Configure com
 ```
 
 Commands can be invoked by the agent or used for custom workflows within your application.
+
+## Prometheus Metrics
+
+This server implements OpenTelemetry metrics export to Prometheus, following [Claude Code's metric naming and structure](https://code.claude.com/docs/en/monitoring-usage).
+
+### Enabling Metrics
+
+Enable metrics collection by setting the following environment variables:
+
+```bash
+# Enable telemetry
+export CLAUDE_CODE_ENABLE_TELEMETRY=1
+
+# Optional: Set custom Prometheus port (default: 9464)
+export PROMETHEUS_PORT=9464
+```
+
+Once enabled, Prometheus metrics will be available at:
+```
+http://localhost:9464/metrics
+```
+
+### Available Metrics
+
+The following metrics are exported following Claude Code's naming conventions:
+
+| Metric Name | Description | Unit | Attributes |
+|-------------|-------------|------|------------|
+| `claude_code.session.count` | Count of sessions started | count | session.id, app.version, terminal.type |
+| `claude_code.token.usage` | Number of tokens used | tokens | session.id, app.version, terminal.type, model, type (input/output/cacheRead/cacheCreation) |
+| `claude_code.cost.usage` | Cost of the session | USD | session.id, app.version, terminal.type, model |
+| `claude_code.lines_of_code.count` | Lines of code modified | count | session.id, app.version, terminal.type, type (added/removed) |
+| `claude_code.code_edit_tool.decision` | Code editing tool permission decisions | count | session.id, app.version, terminal.type, tool (Edit/Write/NotebookEdit), decision (accept/reject), language |
+| `claude_code.active_time.total` | Total active time | seconds | session.id, app.version, terminal.type |
+
+### Standard Attributes
+
+All metrics include the following standard attributes:
+
+- `session.id` - Unique session identifier (UUID)
+- `app.version` - Application version from package.json
+- `terminal.type` - Terminal type (from `TERM` environment variable)
+
+### Prometheus Configuration
+
+Example Prometheus configuration:
+
+```yaml
+scrape_configs:
+  - job_name: 'claude-agentapi'
+    static_configs:
+      - targets: ['localhost:9464']
+    scrape_interval: 60s
+```
+
+### Grafana Dashboard
+
+You can visualize these metrics using Grafana. Example queries:
+
+```promql
+# Total sessions started
+sum(claude_code_session_count)
+
+# Token usage by type
+sum by (type) (claude_code_token_usage)
+
+# Total cost in USD
+sum(claude_code_cost_usage)
+
+# Lines of code added vs removed
+sum by (type) (claude_code_lines_of_code_count)
+```
 
 ## Special Features
 
