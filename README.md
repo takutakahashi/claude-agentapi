@@ -109,9 +109,10 @@ This server uses the Claude Agent SDK v1 API (`query` function) which supports M
 **Supported Configuration**:
 - ✅ `mcpServers` - MCP server configurations (fully supported)
 - ✅ `hooks` - Hook callbacks for responding to events
-- ⏳ `plugins` / `skills` - Plugin configurations (format conversion needed)
-  - Note: The SDK expects `plugins: [{ type: 'local', path: './plugin' }]`
-  - The config format `plugins: { "name": { enabled: true, config: {...} } }` requires conversion
+- ✅ `plugins` - Loaded from `~/.claude/settings.json` `enabledPlugins`
+  - Automatically resolves plugin paths from marketplaces
+  - Supports custom marketplaces via `extraKnownMarketplaces`
+  - Example: `"code-simplifier@claude-plugins-official": true`
 - ⏳ `commands` - Custom command configurations (not yet implemented)
 
 #### Example `.claude/config.json`

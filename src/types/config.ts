@@ -93,6 +93,33 @@ export interface ClaudeConfig {
 }
 
 /**
+ * Claude Code settings.json structure
+ */
+export interface ClaudeSettings {
+  /** Enabled plugins map (name@marketplace -> boolean) */
+  enabledPlugins?: Record<string, boolean>;
+  /** Environment variables */
+  env?: Record<string, string>;
+  /** Extra known marketplaces configuration */
+  extraKnownMarketplaces?: Record<string, {
+    source: {
+      source: string;
+      path: string;
+    };
+  }>;
+  /** Other settings */
+  settings?: Record<string, unknown>;
+}
+
+/**
+ * SDK plugin configuration
+ */
+export interface SdkPluginConfig {
+  type: 'local';
+  path: string;
+}
+
+/**
  * Merged configuration with environment variable overrides
  */
 export interface ResolvedConfig {
@@ -102,8 +129,10 @@ export interface ResolvedConfig {
   permissionMode: 'default' | 'acceptEdits' | 'bypassPermissions';
   /** MCP servers to be passed to the Agent SDK */
   mcpServers?: MCPServersConfig;
-  /** Plugins/skills configuration */
+  /** Plugins/skills configuration (from config.json) */
   plugins?: PluginsConfig;
+  /** Resolved SDK plugins (from settings.json) */
+  sdkPlugins?: SdkPluginConfig[];
   /** Hooks configuration */
   hooks?: HooksConfig;
   /** Custom commands configuration */

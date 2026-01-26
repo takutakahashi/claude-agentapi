@@ -1,7 +1,7 @@
-import { readFile, access } from 'fs/promises';
+import { readFile, access, stat } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
-import type { ClaudeConfig, ResolvedConfig, MCPServersConfig, PluginsConfig } from '../types/config.js';
+import type { ClaudeConfig, ResolvedConfig, MCPServersConfig, PluginsConfig, ClaudeSettings, SdkPluginConfig } from '../types/config.js';
 import { logger } from './logger.js';
 
 /**
@@ -124,6 +124,105 @@ function mergeConfigs(configs: ClaudeConfig[]): ClaudeConfig {
 }
 
 /**
+ * Load Claude settings from ~/.claude/settings.json
+ */
+async function loadClaudeSettings(): Promise<ClaudeSettings | null> {
+  const settingsPath = join(homedir(), '.claude', 'settings.json');
+
+  try {
+    await access(settingsPath);
+    const content = await readFile(settingsPath, 'utf-8');
+    const settings = JSON.parse(content) as ClaudeSettings;
+    logger.debug(`Loaded settings from: ${settingsPath}`);
+    return settings;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      logger.debug(`Settings file not found: ${settingsPath}`);
+    } else {
+      logger.warn(`Failed to load settings from ${settingsPath}:`, error);
+    }
+    return null;
+  }
+}
+
+/**
+ * Resolve plugin path from marketplace
+ */
+async function resolvePluginPath(
+  pluginName: string,
+  marketplace: string,
+  settings: ClaudeSettings | null
+): Promise<string | null> {
+  // Get marketplace path
+  let marketplacePath: string;
+
+  if (settings?.extraKnownMarketplaces?.[marketplace]) {
+    // Use custom marketplace path from settings
+    marketplacePath = settings.extraKnownMarketplaces[marketplace].source.path;
+  } else {
+    // Use default marketplace path
+    marketplacePath = join(
+      homedir(),
+      '.claude',
+      'plugins',
+      'marketplaces',
+      marketplace
+    );
+  }
+
+  // Construct plugin path
+  const pluginPath = join(marketplacePath, 'plugins', pluginName);
+
+  // Check if plugin directory exists
+  try {
+    const stats = await stat(pluginPath);
+    if (stats.isDirectory()) {
+      logger.debug(`Resolved plugin ${pluginName}@${marketplace} to: ${pluginPath}`);
+      return pluginPath;
+    }
+  } catch (error) {
+    logger.debug(`Plugin not found: ${pluginPath}`);
+  }
+
+  return null;
+}
+
+/**
+ * Convert enabled plugins from settings.json to SDK format
+ */
+async function resolvePluginsFromSettings(settings: ClaudeSettings | null): Promise<SdkPluginConfig[]> {
+  if (!settings?.enabledPlugins) {
+    return [];
+  }
+
+  const sdkPlugins: SdkPluginConfig[] = [];
+
+  for (const [fullName, enabled] of Object.entries(settings.enabledPlugins)) {
+    if (!enabled) {
+      continue;
+    }
+
+    // Parse plugin name: "name@marketplace" or just "name"
+    const [pluginName, marketplace = 'claude-plugins-official'] = fullName.split('@');
+
+    // Resolve plugin path
+    const pluginPath = await resolvePluginPath(pluginName, marketplace, settings);
+
+    if (pluginPath) {
+      sdkPlugins.push({
+        type: 'local',
+        path: pluginPath,
+      });
+      logger.debug(`Added plugin: ${fullName} from ${pluginPath}`);
+    } else {
+      logger.warn(`Plugin ${fullName} not found, skipping`);
+    }
+  }
+
+  return sdkPlugins;
+}
+
+/**
  * Resolve final configuration with environment variable overrides
  */
 export async function resolveConfig(): Promise<ResolvedConfig> {
@@ -132,6 +231,9 @@ export async function resolveConfig(): Promise<ResolvedConfig> {
 
   // Load Claude config files
   const claudeConfig = await loadClaudeConfig(workingDirectory);
+
+  // Load Claude settings
+  const settings = await loadClaudeSettings();
 
   // Determine permission mode
   let permissionMode: 'default' | 'acceptEdits' | 'bypassPermissions' = 'default';
@@ -157,11 +259,15 @@ export async function resolveConfig(): Promise<ResolvedConfig> {
     ...claudeConfig.plugins,
   };
 
+  // Resolve SDK plugins from settings.json
+  const sdkPlugins = await resolvePluginsFromSettings(settings);
+
   const resolved: ResolvedConfig = {
     workingDirectory,
     permissionMode,
     mcpServers,
     plugins,
+    sdkPlugins: sdkPlugins.length > 0 ? sdkPlugins : undefined,
     hooks: claudeConfig.hooks,
     commands: claudeConfig.commands,
   };
@@ -177,10 +283,10 @@ export async function resolveConfig(): Promise<ResolvedConfig> {
     logger.info('  MCP servers: none');
   }
 
-  if (plugins && Object.keys(plugins).length > 0) {
-    logger.info(`  Plugins: ${Object.keys(plugins).join(', ')}`);
+  if (sdkPlugins.length > 0) {
+    logger.info(`  SDK Plugins: ${sdkPlugins.length} plugin(s) loaded from settings.json`);
   } else {
-    logger.info('  Plugins: none');
+    logger.info('  SDK Plugins: none');
   }
 
   if (resolved.hooks && Object.keys(resolved.hooks).length > 0) {

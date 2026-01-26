@@ -73,13 +73,10 @@ export class AgentService {
         queryOptions.options!.hooks = config.hooks;
       }
 
-      // Note: plugins in .claude/config.json format needs conversion to SDK format
-      // SDK expects: plugins: [{ type: 'local', path: './plugin' }]
-      // Config has: plugins: { "plugin-name": { enabled: true, config: {...} } }
-      if (config.plugins && Object.keys(config.plugins).length > 0) {
-        logger.info(`Note: Plugin configuration detected but format conversion not yet implemented`);
-        logger.info(`SDK expects: plugins: [{ type: 'local', path: './plugin' }]`);
-        logger.warn(`Config format: plugins: { "name": { enabled: true, config: {...} } } is not directly supported`);
+      // Add SDK plugins if resolved from settings.json
+      if (config.sdkPlugins && config.sdkPlugins.length > 0) {
+        logger.info(`Configuring ${config.sdkPlugins.length} plugin(s) from settings.json...`);
+        queryOptions.options!.plugins = config.sdkPlugins;
       }
 
       // Create input stream manager
