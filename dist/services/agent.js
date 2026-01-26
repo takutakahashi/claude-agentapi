@@ -2,6 +2,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import { sessionService } from './session.js';
 import { logger } from '../utils/logger.js';
 import { resolveConfig } from '../utils/config.js';
+import { getMetricsService } from './metrics.js';
 const MAX_MESSAGE_HISTORY = parseInt(process.env.MAX_MESSAGE_HISTORY || '100', 10);
 // Helper class to manage streaming input
 class InputStreamManager {
@@ -75,6 +76,11 @@ export class AgentService {
             });
             // Start processing query responses in the background
             this.queryProcessorPromise = this.processQuery();
+            // Record session start in metrics
+            const metricsService = getMetricsService();
+            if (metricsService) {
+                metricsService.recordSessionStart();
+            }
             logger.info('Claude Agent SDK initialized successfully with v1 API');
         }
         catch (error) {
@@ -133,6 +139,10 @@ export class AgentService {
     async processSDKMessage(msg) {
         try {
             logger.debug('Processing SDK message:', JSON.stringify(msg, null, 2));
+            // Record metrics for result messages
+            if (msg.type === 'result') {
+                this.recordResultMetrics(msg);
+            }
             // Handle different message types
             if (msg.type === 'assistant') {
                 // Extract text content
@@ -152,6 +162,8 @@ export class AgentService {
                     const toolUseMessage = this.formatToolUse(toolUse);
                     const agentMessage = this.addMessage('agent', toolUseMessage);
                     sessionService.broadcastMessageUpdate(agentMessage);
+                    // Record tool metrics
+                    this.recordToolMetrics(toolUse.name, toolUse.input);
                     // Handle special tool uses
                     await this.handleToolUse(toolUse);
                 }
@@ -239,6 +251,88 @@ export class AgentService {
         }
         return `📋 Plan ready for approval:\n${JSON.stringify(input, null, 2)}`;
     }
+    recordResultMetrics(msg) {
+        const metricsService = getMetricsService();
+        if (!metricsService)
+            return;
+        try {
+            const model = process.env.CLAUDE_MODEL || 'claude-sonnet-4-5-20250929';
+            // Record cost if available
+            if ('total_cost_usd' in msg && typeof msg.total_cost_usd === 'number') {
+                metricsService.recordCost(msg.total_cost_usd, model);
+            }
+            // Record token usage if available
+            if ('usage' in msg && typeof msg.usage === 'object' && msg.usage !== null) {
+                const usage = msg.usage;
+                metricsService.recordTokenUsage({
+                    input: usage.input_tokens,
+                    output: usage.output_tokens,
+                    cacheRead: usage.cache_read_input_tokens,
+                    cacheCreation: usage.cache_creation_input_tokens,
+                }, model);
+            }
+            // Record model usage if available
+            if ('modelUsage' in msg && typeof msg.modelUsage === 'object' && msg.modelUsage !== null) {
+                const modelUsage = msg.modelUsage;
+                for (const [modelName, usage] of Object.entries(modelUsage)) {
+                    if (usage.costUSD) {
+                        metricsService.recordCost(usage.costUSD, modelName);
+                    }
+                    metricsService.recordTokenUsage({
+                        input: usage.inputTokens,
+                        output: usage.outputTokens,
+                        cacheRead: usage.cacheReadInputTokens,
+                        cacheCreation: usage.cacheCreationInputTokens,
+                    }, modelName);
+                }
+            }
+        }
+        catch (error) {
+            logger.error('Error recording result metrics:', error);
+        }
+    }
+    recordToolMetrics(toolName, input) {
+        const metricsService = getMetricsService();
+        if (!metricsService)
+            return;
+        try {
+            // Record code edit tool usage
+            if (toolName === 'Edit' || toolName === 'Write' || toolName === 'NotebookEdit') {
+                // Extract language from file path if available
+                let language = 'unknown';
+                if (typeof input === 'object' && input !== null && 'file_path' in input) {
+                    const filePath = input.file_path;
+                    if (typeof filePath === 'string') {
+                        const ext = filePath.split('.').pop()?.toLowerCase();
+                        const languageMap = {
+                            'ts': 'TypeScript',
+                            'js': 'JavaScript',
+                            'py': 'Python',
+                            'md': 'Markdown',
+                            'json': 'JSON',
+                            'yaml': 'YAML',
+                            'yml': 'YAML',
+                        };
+                        language = languageMap[ext || ''] || ext || 'unknown';
+                    }
+                }
+                // For now, we assume tools are accepted
+                // In a real implementation, this would track actual permission decisions
+                metricsService.recordCodeEditToolDecision(toolName, 'accept', language);
+            }
+            // Record lines of code for Edit and Write tools
+            if (toolName === 'Write' && typeof input === 'object' && input !== null && 'content' in input) {
+                const content = input.content;
+                if (typeof content === 'string') {
+                    const lines = content.split('\n').length;
+                    metricsService.recordLinesOfCode(lines, 0);
+                }
+            }
+        }
+        catch (error) {
+            logger.error('Error recording tool metrics:', error);
+        }
+    }
     addMessage(role, content, type) {
         const message = {
             id: this.generateMessageId(),
@@ -290,6 +384,11 @@ export class AgentService {
             catch (error) {
                 logger.error('Error waiting for query processor:', error);
             }
+        }
+        // Record session end metrics
+        const metricsService = getMetricsService();
+        if (metricsService) {
+            metricsService.recordSessionEnd();
         }
     }
 }

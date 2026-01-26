@@ -4,8 +4,25 @@ import { createServer } from '../../server.js';
 import { agentService } from '../../services/agent.js';
 
 // Mock services
-vi.mock('../../services/agent.js');
-vi.mock('../../services/session.js');
+vi.mock('../../services/agent.js', () => ({
+  agentService: {
+    getStatus: vi.fn(),
+    sendMessage: vi.fn(),
+    getMessages: vi.fn(),
+    initialize: vi.fn(),
+    cleanup: vi.fn(),
+  },
+}));
+vi.mock('../../services/session.js', () => ({
+  sessionService: {
+    subscribe: vi.fn(),
+    unsubscribe: vi.fn(),
+    broadcastMessageUpdate: vi.fn(),
+    broadcastStatusChange: vi.fn(),
+    sendInitialState: vi.fn(),
+    getSubscriberCount: vi.fn(),
+  },
+}));
 
 describe('POST /message', () => {
   const app = createServer();
@@ -45,8 +62,8 @@ describe('POST /message', () => {
 
   describe('user message', () => {
     it('should accept valid user message when agent is stable', async () => {
-      vi.mocked(agentService.getStatus).mockReturnValue('stable');
-      vi.mocked(agentService.sendMessage).mockResolvedValue(undefined);
+      (agentService.getStatus as ReturnType<typeof vi.fn>).mockReturnValue('stable');
+      (agentService.sendMessage as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
       const response = await request(app)
         .post('/message')
@@ -58,7 +75,7 @@ describe('POST /message', () => {
     });
 
     it('should reject message when agent is busy', async () => {
-      vi.mocked(agentService.getStatus).mockReturnValue('running');
+      (agentService.getStatus as ReturnType<typeof vi.fn>).mockReturnValue('running');
 
       const response = await request(app)
         .post('/message')
@@ -70,8 +87,8 @@ describe('POST /message', () => {
     });
 
     it('should handle sendMessage errors', async () => {
-      vi.mocked(agentService.getStatus).mockReturnValue('stable');
-      vi.mocked(agentService.sendMessage).mockRejectedValue(
+      (agentService.getStatus as ReturnType<typeof vi.fn>).mockReturnValue('stable');
+      (agentService.sendMessage as ReturnType<typeof vi.fn>).mockRejectedValue(
         new Error('Agent error')
       );
 

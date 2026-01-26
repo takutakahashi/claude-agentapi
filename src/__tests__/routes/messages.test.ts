@@ -5,8 +5,25 @@ import { agentService } from '../../services/agent.js';
 import type { Message } from '../../types/api.js';
 
 // Mock services
-vi.mock('../../services/agent.js');
-vi.mock('../../services/session.js');
+vi.mock('../../services/agent.js', () => ({
+  agentService: {
+    getStatus: vi.fn(),
+    sendMessage: vi.fn(),
+    getMessages: vi.fn(),
+    initialize: vi.fn(),
+    cleanup: vi.fn(),
+  },
+}));
+vi.mock('../../services/session.js', () => ({
+  sessionService: {
+    subscribe: vi.fn(),
+    unsubscribe: vi.fn(),
+    broadcastMessageUpdate: vi.fn(),
+    broadcastStatusChange: vi.fn(),
+    sendInitialState: vi.fn(),
+    getSubscriberCount: vi.fn(),
+  },
+}));
 
 describe('GET /messages', () => {
   const app = createServer();
@@ -16,7 +33,7 @@ describe('GET /messages', () => {
   });
 
   it('should return empty array when no messages', async () => {
-    vi.mocked(agentService.getMessages).mockReturnValue([]);
+    (agentService.getMessages as ReturnType<typeof vi.fn>).mockReturnValue([]);
 
     const response = await request(app).get('/messages');
 
@@ -43,7 +60,7 @@ describe('GET /messages', () => {
       },
     ];
 
-    vi.mocked(agentService.getMessages).mockReturnValue(mockMessages);
+    (agentService.getMessages as ReturnType<typeof vi.fn>).mockReturnValue(mockMessages);
 
     const response = await request(app).get('/messages');
 
@@ -55,7 +72,7 @@ describe('GET /messages', () => {
   });
 
   it('should call agentService.getMessages', async () => {
-    vi.mocked(agentService.getMessages).mockReturnValue([]);
+    (agentService.getMessages as ReturnType<typeof vi.fn>).mockReturnValue([]);
 
     await request(app).get('/messages');
 

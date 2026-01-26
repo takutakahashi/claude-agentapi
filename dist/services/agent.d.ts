@@ -15,6 +15,8 @@ export declare class AgentService {
     private formatToolUse;
     private formatQuestion;
     private formatPlan;
+    private recordResultMetrics;
+    private recordToolMetrics;
     private addMessage;
     private generateMessageId;
     private setStatus;

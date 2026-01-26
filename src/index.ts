@@ -2,13 +2,29 @@ import 'dotenv/config';
 import { createServer } from './server.js';
 import { agentService } from './services/agent.js';
 import { logger } from './utils/logger.js';
+import { initializeTelemetry, shutdownTelemetry } from './utils/telemetry.js';
+import { initializeMetricsService } from './services/metrics.js';
+import { randomUUID } from 'crypto';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || 'localhost';
+const TELEMETRY_ENABLED = process.env.CLAUDE_CODE_ENABLE_TELEMETRY === '1';
+const PROMETHEUS_PORT = parseInt(process.env.PROMETHEUS_PORT || '9464', 10);
 
 async function main() {
   try {
     logger.info('Starting agentapi-bedrock-server...');
+
+    // Initialize telemetry
+    if (TELEMETRY_ENABLED) {
+      logger.info('Initializing telemetry...');
+      initializeTelemetry(true, PROMETHEUS_PORT);
+
+      // Initialize metrics service with a session ID
+      const sessionId = randomUUID();
+      initializeMetricsService(sessionId);
+      logger.info(`Telemetry initialized with session ID: ${sessionId}`);
+    }
 
     // Initialize agent service
     await agentService.initialize();
@@ -24,6 +40,11 @@ async function main() {
       logger.info('  GET  /messages        - Message history');
       logger.info('  POST /message         - Send message to agent');
       logger.info('  GET  /events          - SSE event stream');
+
+      if (TELEMETRY_ENABLED) {
+        logger.info(`\nPrometheus metrics:`);
+        logger.info(`  GET  http://${HOST}:${PROMETHEUS_PORT}/metrics`);
+      }
     });
 
     // Graceful shutdown
@@ -35,6 +56,11 @@ async function main() {
       });
 
       await agentService.cleanup();
+
+      if (TELEMETRY_ENABLED) {
+        await shutdownTelemetry();
+      }
+
       process.exit(0);
     };
 
