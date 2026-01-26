@@ -26,6 +26,52 @@ This project implements a server compatible with the [coder/agentapi](https://gi
 
 ## Installation
 
+### Quick Start with npx/bunx (Recommended)
+
+#### From GitHub Packages
+
+```bash
+# Create a .env file with your configuration
+cat > .env << 'EOF'
+PORT=3000
+HOST=localhost
+CLAUDE_CODE_USE_BEDROCK=0
+CLAUDE_MODEL=claude-sonnet-4-5-20250929
+ANTHROPIC_OAUTH_TOKEN=your_oauth_token_here
+EOF
+
+# Configure npm to use GitHub Packages
+echo "@takutakahashi:registry=https://npm.pkg.github.com" >> .npmrc
+
+# Run with npx
+npx @takutakahashi/claude-agentapi
+
+# Or install globally
+npm install -g @takutakahashi/claude-agentapi
+claude-agentapi
+```
+
+#### From npm Registry (if published)
+
+```bash
+# Create a .env file with your configuration
+cat > .env << 'EOF'
+PORT=3000
+HOST=localhost
+CLAUDE_CODE_USE_BEDROCK=0
+CLAUDE_MODEL=claude-sonnet-4-5-20250929
+ANTHROPIC_OAUTH_TOKEN=your_oauth_token_here
+EOF
+
+# Run with npx (npm)
+npx claude-agentapi
+
+# Or with bunx (Bun)
+bunx claude-agentapi
+```
+
+### Manual Installation
+
 1. Clone the repository:
 ```bash
 git clone <repository-url>
@@ -73,6 +119,17 @@ Use either API Key or OAuth Token (not both):
 - `MAX_MESSAGE_HISTORY` - Maximum messages to keep in history (default: 100)
 
 ## Usage
+
+### Run with npx/bunx
+
+If you used npx/bunx for installation:
+
+```bash
+# Make sure you have a .env file in the current directory
+npx claude-agentapi
+# or
+bunx claude-agentapi
+```
 
 ### Development Mode
 
