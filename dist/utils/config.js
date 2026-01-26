@@ -3,6 +3,18 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { logger } from './logger.js';
 /**
+ * Try to parse a string as JSON
+ * Returns the parsed result or null if parsing fails
+ */
+function tryParseJson(str) {
+    try {
+        return JSON.parse(str);
+    }
+    catch {
+        return null;
+    }
+}
+/**
  * Load MCP config from --mcp-config option
  * Supports both JSON string and file path
  */
@@ -11,20 +23,18 @@ async function loadMcpConfigFromOption() {
     if (!mcpConfigOption) {
         return null;
     }
+    // First, try to parse as JSON string
+    const jsonConfig = tryParseJson(mcpConfigOption);
+    if (jsonConfig) {
+        logger.info('Loaded MCP config from --mcp-config (JSON string)');
+        return jsonConfig;
+    }
+    // If not valid JSON, try as file path
     try {
-        // First, try to parse as JSON string
-        try {
-            const parsed = JSON.parse(mcpConfigOption);
-            logger.info('Loaded MCP config from --mcp-config (JSON string)');
-            return parsed;
-        }
-        catch {
-            // If not valid JSON, try as file path
-            const content = await readFile(mcpConfigOption, 'utf-8');
-            const parsed = JSON.parse(content);
-            logger.info(`Loaded MCP config from --mcp-config (file): ${mcpConfigOption}`);
-            return parsed;
-        }
+        const content = await readFile(mcpConfigOption, 'utf-8');
+        const parsed = JSON.parse(content);
+        logger.info(`Loaded MCP config from --mcp-config (file): ${mcpConfigOption}`);
+        return parsed;
     }
     catch (error) {
         logger.error(`Failed to load MCP config from --mcp-config: ${error}`);
@@ -81,15 +91,13 @@ export async function loadClaudeConfig(workingDirectory) {
  */
 async function loadConfigFile(path) {
     try {
-        // Check if file exists
         await access(path);
         const content = await readFile(path, 'utf-8');
-        const config = JSON.parse(content);
-        return config;
+        return JSON.parse(content);
     }
     catch (error) {
-        // File doesn't exist or can't be read - this is not an error
-        if (error.code === 'ENOENT') {
+        const isNotFound = error.code === 'ENOENT';
+        if (isNotFound) {
             logger.debug(`Config file not found: ${path}`);
         }
         else {
@@ -99,60 +107,29 @@ async function loadConfigFile(path) {
     }
 }
 /**
+ * Merge a single object property from source into target
+ */
+function mergeObjectProperty(target, source, key) {
+    if (source[key]) {
+        target[key] = { ...target[key], ...source[key] };
+    }
+}
+/**
  * Merge multiple config objects
  * Later configs override earlier ones
  */
 function mergeConfigs(configs) {
     const merged = {};
     for (const config of configs) {
-        // Merge mcpServers
-        if (config.mcpServers) {
-            merged.mcpServers = {
-                ...merged.mcpServers,
-                ...config.mcpServers,
-            };
-        }
-        // Merge plugins
-        if (config.plugins) {
-            merged.plugins = {
-                ...merged.plugins,
-                ...config.plugins,
-            };
-        }
-        // Merge skills (alias for plugins)
-        if (config.skills) {
-            merged.skills = {
-                ...merged.skills,
-                ...config.skills,
-            };
-        }
-        // Merge hooks
-        if (config.hooks) {
-            merged.hooks = {
-                ...merged.hooks,
-                ...config.hooks,
-            };
-        }
-        // Merge commands
-        if (config.commands) {
-            merged.commands = {
-                ...merged.commands,
-                ...config.commands,
-            };
-        }
-        // Merge allowedTools (concatenate arrays)
+        mergeObjectProperty(merged, config, 'mcpServers');
+        mergeObjectProperty(merged, config, 'plugins');
+        mergeObjectProperty(merged, config, 'skills');
+        mergeObjectProperty(merged, config, 'hooks');
+        mergeObjectProperty(merged, config, 'commands');
+        mergeObjectProperty(merged, config, 'env');
+        // Merge allowedTools by concatenation rather than override
         if (config.allowedTools) {
-            merged.allowedTools = [
-                ...(merged.allowedTools || []),
-                ...config.allowedTools,
-            ];
-        }
-        // Merge env
-        if (config.env) {
-            merged.env = {
-                ...merged.env,
-                ...config.env,
-            };
+            merged.allowedTools = [...(merged.allowedTools || []), ...config.allowedTools];
         }
     }
     return merged;
@@ -165,12 +142,12 @@ async function loadClaudeSettings() {
     try {
         await access(settingsPath);
         const content = await readFile(settingsPath, 'utf-8');
-        const settings = JSON.parse(content);
         logger.debug(`Loaded settings from: ${settingsPath}`);
-        return settings;
+        return JSON.parse(content);
     }
     catch (error) {
-        if (error.code === 'ENOENT') {
+        const isNotFound = error.code === 'ENOENT';
+        if (isNotFound) {
             logger.debug(`Settings file not found: ${settingsPath}`);
         }
         else {
@@ -180,22 +157,21 @@ async function loadClaudeSettings() {
     }
 }
 /**
+ * Get the marketplace base path from settings or use default
+ */
+function getMarketplacePath(marketplace, settings) {
+    const customPath = settings?.extraKnownMarketplaces?.[marketplace]?.source.path;
+    if (customPath) {
+        return customPath;
+    }
+    return join(homedir(), '.claude', 'plugins', 'marketplaces', marketplace);
+}
+/**
  * Resolve plugin path from marketplace
  */
 async function resolvePluginPath(pluginName, marketplace, settings) {
-    // Get marketplace path
-    let marketplacePath;
-    if (settings?.extraKnownMarketplaces?.[marketplace]) {
-        // Use custom marketplace path from settings
-        marketplacePath = settings.extraKnownMarketplaces[marketplace].source.path;
-    }
-    else {
-        // Use default marketplace path
-        marketplacePath = join(homedir(), '.claude', 'plugins', 'marketplaces', marketplace);
-    }
-    // Construct plugin path
+    const marketplacePath = getMarketplacePath(marketplace, settings);
     const pluginPath = join(marketplacePath, 'plugins', pluginName);
-    // Check if plugin directory exists
     try {
         const stats = await stat(pluginPath);
         if (stats.isDirectory()) {
@@ -203,7 +179,7 @@ async function resolvePluginPath(pluginName, marketplace, settings) {
             return pluginPath;
         }
     }
-    catch (error) {
+    catch {
         logger.debug(`Plugin not found: ${pluginPath}`);
     }
     return null;
@@ -237,6 +213,25 @@ async function resolvePluginsFromSettings(settings) {
     }
     return sdkPlugins;
 }
+const VALID_PERMISSION_MODES = ['default', 'acceptEdits', 'bypassPermissions'];
+/**
+ * Resolve permission mode from environment variables
+ */
+function resolvePermissionMode() {
+    if (process.env.DANGEROUSLY_SKIP_PERMISSIONS === 'true') {
+        logger.warn('WARNING: All permission checks are disabled (bypassPermissions mode)');
+        return 'bypassPermissions';
+    }
+    const mode = process.env.CLAUDE_PERMISSION_MODE;
+    if (!mode) {
+        return 'default';
+    }
+    if (VALID_PERMISSION_MODES.includes(mode)) {
+        return mode;
+    }
+    logger.warn(`Invalid permission mode: ${mode}. Using default.`);
+    return 'default';
+}
 /**
  * Resolve final configuration with environment variable overrides
  */
@@ -248,20 +243,7 @@ export async function resolveConfig() {
     // Load Claude settings
     const settings = await loadClaudeSettings();
     // Determine permission mode
-    let permissionMode = 'default';
-    if (process.env.DANGEROUSLY_SKIP_PERMISSIONS === 'true') {
-        permissionMode = 'bypassPermissions';
-        logger.warn('⚠️  WARNING: All permission checks are disabled (bypassPermissions mode)');
-    }
-    else if (process.env.CLAUDE_PERMISSION_MODE) {
-        const mode = process.env.CLAUDE_PERMISSION_MODE;
-        if (mode === 'default' || mode === 'acceptEdits' || mode === 'bypassPermissions') {
-            permissionMode = mode;
-        }
-        else {
-            logger.warn(`Invalid permission mode: ${mode}. Using default.`);
-        }
-    }
+    const permissionMode = resolvePermissionMode();
     // Filter out disabled MCP servers
     const mcpServers = filterEnabledMCPServers(claudeConfig.mcpServers);
     // Merge plugins and skills
@@ -282,35 +264,22 @@ export async function resolveConfig() {
         allowedTools: claudeConfig.allowedTools,
         env: claudeConfig.env,
     };
-    // Log configuration summary
-    logger.info('Configuration resolved:');
-    logger.info(`  Working directory: ${resolved.workingDirectory}`);
-    logger.info(`  Permission mode: ${resolved.permissionMode}`);
-    if (mcpServers && Object.keys(mcpServers).length > 0) {
-        logger.info(`  MCP servers: ${Object.keys(mcpServers).join(', ')}`);
-    }
-    else {
-        logger.info('  MCP servers: none');
-    }
-    if (sdkPlugins.length > 0) {
-        logger.info(`  SDK Plugins: ${sdkPlugins.length} plugin(s) loaded from settings.json`);
-    }
-    else {
-        logger.info('  SDK Plugins: none');
-    }
-    if (resolved.hooks && Object.keys(resolved.hooks).length > 0) {
-        logger.info(`  Hooks: ${Object.keys(resolved.hooks).join(', ')}`);
-    }
-    else {
-        logger.info('  Hooks: none');
-    }
-    if (resolved.commands && Object.keys(resolved.commands).length > 0) {
-        logger.info(`  Commands: ${Object.keys(resolved.commands).join(', ')}`);
-    }
-    else {
-        logger.info('  Commands: none');
-    }
+    logConfigSummary(resolved, sdkPlugins);
     return resolved;
+}
+/**
+ * Log a summary of the resolved configuration
+ */
+function logConfigSummary(config, sdkPlugins) {
+    const formatKeys = (obj) => obj && Object.keys(obj).length > 0 ? Object.keys(obj).join(', ') : 'none';
+    const formatPlugins = () => sdkPlugins.length > 0 ? `${sdkPlugins.length} plugin(s) loaded from settings.json` : 'none';
+    logger.info('Configuration resolved:');
+    logger.info(`  Working directory: ${config.workingDirectory}`);
+    logger.info(`  Permission mode: ${config.permissionMode}`);
+    logger.info(`  MCP servers: ${formatKeys(config.mcpServers)}`);
+    logger.info(`  SDK Plugins: ${formatPlugins()}`);
+    logger.info(`  Hooks: ${formatKeys(config.hooks)}`);
+    logger.info(`  Commands: ${formatKeys(config.commands)}`);
 }
 /**
  * Filter out disabled MCP servers

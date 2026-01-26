@@ -1,11 +1,6 @@
 #!/usr/bin/env bun
 
-// Parse command-line arguments
-const args = process.argv.slice(2);
-
-// Check for --help or -h flag
-if (args.includes('--help') || args.includes('-h')) {
-  console.log(`
+const HELP_TEXT = `
 claude-agentapi - coder/agentapi compatible HTTP API server using Claude Agent SDK
 
 Usage: claude-agentapi [options]
@@ -38,32 +33,55 @@ Configuration:
   3. Working directory config: {workingDirectory}/.claude/config.json
 
 For more information, visit: https://github.com/takutakahashi/claude-agentapi
-`);
+`;
+
+/**
+ * Find the value of an argument option by its flags
+ */
+function getArgValue(args, ...flags) {
+  const index = args.findIndex(arg => flags.includes(arg));
+  if (index !== -1 && args[index + 1]) {
+    return args[index + 1];
+  }
+  return null;
+}
+
+/**
+ * Check if an argument flag is present
+ */
+function hasFlag(args, ...flags) {
+  return args.some(arg => flags.includes(arg));
+}
+
+// Parse command-line arguments
+const args = process.argv.slice(2);
+
+// Handle --help flag
+if (hasFlag(args, '--help', '-h')) {
+  console.log(HELP_TEXT);
   process.exit(0);
 }
 
-// Check for --dangerously-skip-permissions flag
-if (args.includes('--dangerously-skip-permissions')) {
+// Handle --dangerously-skip-permissions flag
+if (hasFlag(args, '--dangerously-skip-permissions')) {
   process.env.DANGEROUSLY_SKIP_PERMISSIONS = 'true';
-  console.warn('⚠️  WARNING: All permission checks are disabled. Use with extreme caution!');
+  console.warn('WARNING: All permission checks are disabled. Use with extreme caution!');
 }
 
-// Check for --working-directory option
-const workingDirIndex = args.findIndex(arg => arg === '--working-directory' || arg === '-w');
-if (workingDirIndex !== -1 && args[workingDirIndex + 1]) {
-  process.env.CLAUDE_WORKING_DIRECTORY = args[workingDirIndex + 1];
+// Set environment variables from CLI options
+const workingDir = getArgValue(args, '--working-directory', '-w');
+if (workingDir) {
+  process.env.CLAUDE_WORKING_DIRECTORY = workingDir;
 }
 
-// Check for --permission-mode option
-const permissionModeIndex = args.findIndex(arg => arg === '--permission-mode' || arg === '-p');
-if (permissionModeIndex !== -1 && args[permissionModeIndex + 1]) {
-  process.env.CLAUDE_PERMISSION_MODE = args[permissionModeIndex + 1];
+const permissionMode = getArgValue(args, '--permission-mode', '-p');
+if (permissionMode) {
+  process.env.CLAUDE_PERMISSION_MODE = permissionMode;
 }
 
-// Check for --mcp-config option
-const mcpConfigIndex = args.findIndex(arg => arg === '--mcp-config');
-if (mcpConfigIndex !== -1 && args[mcpConfigIndex + 1]) {
-  process.env.CLAUDE_MCP_CONFIG = args[mcpConfigIndex + 1];
+const mcpConfig = getArgValue(args, '--mcp-config');
+if (mcpConfig) {
+  process.env.CLAUDE_MCP_CONFIG = mcpConfig;
 }
 
 // Import and run the main application

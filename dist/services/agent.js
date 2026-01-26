@@ -52,31 +52,8 @@ export class AgentService {
                     permissionMode: config.permissionMode,
                 },
             };
-            // Add MCP servers if configured
-            if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
-                logger.info(`Configuring ${Object.keys(config.mcpServers).length} MCP server(s)...`);
-                queryOptions.options.mcpServers = config.mcpServers;
-            }
-            // Add allowed tools if configured
-            if (config.allowedTools && config.allowedTools.length > 0) {
-                logger.info(`Configuring ${config.allowedTools.length} allowed tool(s)...`);
-                queryOptions.options.allowedTools = config.allowedTools;
-            }
-            // Add environment variables if configured
-            if (config.env && Object.keys(config.env).length > 0) {
-                logger.info(`Configuring ${Object.keys(config.env).length} environment variable(s)...`);
-                queryOptions.options.env = config.env;
-            }
-            // Add hooks if configured
-            if (config.hooks && Object.keys(config.hooks).length > 0) {
-                logger.info(`Configuring ${Object.keys(config.hooks).length} hook(s)...`);
-                queryOptions.options.hooks = config.hooks;
-            }
-            // Add SDK plugins if resolved from settings.json
-            if (config.sdkPlugins && config.sdkPlugins.length > 0) {
-                logger.info(`Configuring ${config.sdkPlugins.length} plugin(s) from settings.json...`);
-                queryOptions.options.plugins = config.sdkPlugins;
-            }
+            // Apply optional configuration
+            this.applyOptionalConfig(queryOptions.options, config);
             // Create input stream manager
             this.inputStreamManager = new InputStreamManager();
             // Create query with streaming input
@@ -96,6 +73,31 @@ export class AgentService {
         catch (error) {
             logger.error('Failed to initialize Claude Agent SDK:', error);
             throw error;
+        }
+    }
+    /**
+     * Apply optional configuration to query options
+     */
+    applyOptionalConfig(options, config) {
+        if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
+            logger.info(`Configuring ${Object.keys(config.mcpServers).length} MCP server(s)...`);
+            options.mcpServers = config.mcpServers;
+        }
+        if (config.allowedTools && config.allowedTools.length > 0) {
+            logger.info(`Configuring ${config.allowedTools.length} allowed tool(s)...`);
+            options.allowedTools = config.allowedTools;
+        }
+        if (config.env && Object.keys(config.env).length > 0) {
+            logger.info(`Configuring ${Object.keys(config.env).length} environment variable(s)...`);
+            options.env = config.env;
+        }
+        if (config.hooks && Object.keys(config.hooks).length > 0) {
+            logger.info(`Configuring ${Object.keys(config.hooks).length} hook(s)...`);
+            options.hooks = config.hooks;
+        }
+        if (config.sdkPlugins && config.sdkPlugins.length > 0) {
+            logger.info(`Configuring ${config.sdkPlugins.length} plugin(s) from settings.json...`);
+            options.plugins = config.sdkPlugins;
         }
     }
     async processQuery() {
@@ -205,40 +207,47 @@ export class AgentService {
         }
     }
     async handleSystemMessage(msg) {
-        if (msg.subtype === 'init') {
-            logger.info('System init message received');
-            // Check MCP server connection status
-            if ('mcp_servers' in msg && Array.isArray(msg.mcp_servers)) {
-                const mcpServers = msg.mcp_servers;
-                for (const server of mcpServers) {
-                    if (server.status === 'connected') {
-                        logger.info(`✓ MCP server '${server.name}' connected successfully`);
-                    }
-                    else if (server.status === 'failed') {
-                        logger.error(`✗ MCP server '${server.name}' failed to connect${server.error ? `: ${server.error}` : ''}`);
-                    }
-                    else {
-                        logger.warn(`⚠ MCP server '${server.name}' status: ${server.status}`);
-                    }
-                }
+        if (msg.subtype !== 'init') {
+            return;
+        }
+        logger.info('System init message received');
+        this.logMcpServerStatus(msg);
+    }
+    logMcpServerStatus(msg) {
+        if (!('mcp_servers' in msg) || !Array.isArray(msg.mcp_servers)) {
+            return;
+        }
+        const mcpServers = msg.mcp_servers;
+        for (const server of mcpServers) {
+            switch (server.status) {
+                case 'connected':
+                    logger.info(`MCP server '${server.name}' connected successfully`);
+                    break;
+                case 'failed':
+                    logger.error(`MCP server '${server.name}' failed to connect${server.error ? `: ${server.error}` : ''}`);
+                    break;
+                default:
+                    logger.warn(`MCP server '${server.name}' status: ${server.status}`);
             }
         }
     }
     async handleToolUse(toolUse) {
         const { name, input } = toolUse;
-        if (name === 'AskUserQuestion') {
-            // Format as a question message
-            const questionText = this.formatQuestion(input);
-            const questionMessage = this.addMessage('assistant', questionText, 'question');
-            sessionService.broadcastMessageUpdate(questionMessage);
-            logger.info('AskUserQuestion detected and broadcasted');
-        }
-        else if (name === 'ExitPlanMode') {
-            // Format as a plan message
-            const planText = this.formatPlan(input);
-            const planMessage = this.addMessage('assistant', planText, 'plan');
-            sessionService.broadcastMessageUpdate(planMessage);
-            logger.info('ExitPlanMode detected and broadcasted');
+        switch (name) {
+            case 'AskUserQuestion': {
+                const questionText = this.formatQuestion(input);
+                const questionMessage = this.addMessage('assistant', questionText, 'question');
+                sessionService.broadcastMessageUpdate(questionMessage);
+                logger.info('AskUserQuestion detected and broadcasted');
+                break;
+            }
+            case 'ExitPlanMode': {
+                const planText = this.formatPlan(input);
+                const planMessage = this.addMessage('assistant', planText, 'plan');
+                sessionService.broadcastMessageUpdate(planMessage);
+                logger.info('ExitPlanMode detected and broadcasted');
+                break;
+            }
         }
     }
     formatToolUse(toolUse) {
@@ -331,41 +340,47 @@ export class AgentService {
         if (!metricsService)
             return;
         try {
-            // Record code edit tool usage
-            if (toolName === 'Edit' || toolName === 'Write' || toolName === 'NotebookEdit') {
-                // Extract language from file path if available
-                let language = 'unknown';
-                if (typeof input === 'object' && input !== null && 'file_path' in input) {
-                    const filePath = input.file_path;
-                    if (typeof filePath === 'string') {
-                        const ext = filePath.split('.').pop()?.toLowerCase();
-                        const languageMap = {
-                            'ts': 'TypeScript',
-                            'js': 'JavaScript',
-                            'py': 'Python',
-                            'md': 'Markdown',
-                            'json': 'JSON',
-                            'yaml': 'YAML',
-                            'yml': 'YAML',
-                        };
-                        language = languageMap[ext || ''] || ext || 'unknown';
-                    }
-                }
-                // For now, we assume tools are accepted
-                // In a real implementation, this would track actual permission decisions
+            const isCodeEditTool = toolName === 'Edit' || toolName === 'Write' || toolName === 'NotebookEdit';
+            if (isCodeEditTool) {
+                const language = this.detectLanguageFromInput(input);
                 metricsService.recordCodeEditToolDecision(toolName, 'accept', language);
             }
-            // Record lines of code for Edit and Write tools
-            if (toolName === 'Write' && typeof input === 'object' && input !== null && 'content' in input) {
-                const content = input.content;
-                if (typeof content === 'string') {
-                    const lines = content.split('\n').length;
-                    metricsService.recordLinesOfCode(lines, 0);
-                }
+            if (toolName === 'Write') {
+                this.recordWriteToolMetrics(input, metricsService);
             }
         }
         catch (error) {
             logger.error('Error recording tool metrics:', error);
+        }
+    }
+    detectLanguageFromInput(input) {
+        if (typeof input !== 'object' || input === null || !('file_path' in input)) {
+            return 'unknown';
+        }
+        const filePath = input.file_path;
+        if (typeof filePath !== 'string') {
+            return 'unknown';
+        }
+        const ext = filePath.split('.').pop()?.toLowerCase();
+        const languageMap = {
+            ts: 'TypeScript',
+            js: 'JavaScript',
+            py: 'Python',
+            md: 'Markdown',
+            json: 'JSON',
+            yaml: 'YAML',
+            yml: 'YAML',
+        };
+        return languageMap[ext || ''] || ext || 'unknown';
+    }
+    recordWriteToolMetrics(input, metricsService) {
+        if (typeof input !== 'object' || input === null || !('content' in input)) {
+            return;
+        }
+        const content = input.content;
+        if (typeof content === 'string') {
+            const lines = content.split('\n').length;
+            metricsService.recordLinesOfCode(lines, 0);
         }
     }
     addMessage(role, content, type) {
