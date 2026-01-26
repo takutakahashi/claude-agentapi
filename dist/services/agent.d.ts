@@ -1,11 +1,14 @@
 import type { Message } from '../types/api.js';
 import type { AgentStatus } from '../types/agent.js';
 export declare class AgentService {
-    private session;
+    private query;
+    private inputStreamManager;
+    private queryProcessorPromise;
     private status;
     private messages;
     private messageIdCounter;
     initialize(): Promise<void>;
+    private processQuery;
     sendMessage(content: string): Promise<void>;
     private processSDKMessage;
     private handleToolUse;

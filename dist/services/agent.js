@@ -1,63 +1,107 @@
-import { unstable_v2_createSession } from '@anthropic-ai/claude-agent-sdk';
+import { query } from '@anthropic-ai/claude-agent-sdk';
 import { sessionService } from './session.js';
 import { logger } from '../utils/logger.js';
 import { resolveConfig } from '../utils/config.js';
 const MAX_MESSAGE_HISTORY = parseInt(process.env.MAX_MESSAGE_HISTORY || '100', 10);
+// Helper class to manage streaming input
+class InputStreamManager {
+    resolveNext = null;
+    queue = [];
+    async *stream() {
+        while (true) {
+            if (this.queue.length > 0) {
+                yield this.queue.shift();
+            }
+            else {
+                yield await new Promise((resolve) => {
+                    this.resolveNext = resolve;
+                });
+            }
+        }
+    }
+    send(message) {
+        if (this.resolveNext) {
+            this.resolveNext(message);
+            this.resolveNext = null;
+        }
+        else {
+            this.queue.push(message);
+        }
+    }
+}
 export class AgentService {
-    session = null;
+    query = null;
+    inputStreamManager = null;
+    queryProcessorPromise = null;
     status = 'stable';
     messages = [];
     messageIdCounter = 0;
     async initialize() {
         try {
-            logger.info('Initializing Claude Agent SDK session...');
+            logger.info('Initializing Claude Agent SDK with v1 API...');
             // Resolve configuration from .claude/config.json and environment variables
             const config = await resolveConfig();
             const model = process.env.CLAUDE_MODEL || 'claude-sonnet-4-5-20250929';
-            // Build session configuration
-            const sessionConfig = {
-                model,
-                workingDirectory: config.workingDirectory,
-                permissionMode: config.permissionMode,
+            // Build query options with v1 API
+            const queryOptions = {
+                prompt: '', // Initial empty prompt - we'll use streaming input
+                options: {
+                    model,
+                    cwd: config.workingDirectory,
+                    permissionMode: config.permissionMode,
+                },
             };
             // Add MCP servers if configured
             if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
-                logger.info('Configuring MCP servers...');
-                // Convert our MCPServersConfig to the format expected by the SDK
-                // @ts-expect-error - mcpServers may not be in the type definition yet
-                sessionConfig.mcpServers = config.mcpServers;
-            }
-            // Add plugins/skills if configured
-            if (config.plugins && Object.keys(config.plugins).length > 0) {
-                logger.info('Configuring plugins/skills...');
-                // The SDK may have a plugins parameter - we'll pass it through
-                // @ts-expect-error - plugins may not be in the type definition yet
-                sessionConfig.plugins = config.plugins;
+                logger.info(`Configuring ${Object.keys(config.mcpServers).length} MCP server(s)...`);
+                queryOptions.options.mcpServers = config.mcpServers;
             }
             // Add hooks if configured
             if (config.hooks && Object.keys(config.hooks).length > 0) {
-                logger.info('Configuring hooks...');
-                // @ts-expect-error - hooks may not be in the type definition yet
-                sessionConfig.hooks = config.hooks;
+                logger.info(`Configuring ${Object.keys(config.hooks).length} hook(s)...`);
+                queryOptions.options.hooks = config.hooks;
             }
-            // Add commands if configured
-            if (config.commands && Object.keys(config.commands).length > 0) {
-                logger.info('Configuring commands...');
-                // @ts-expect-error - commands may not be in the type definition yet
-                sessionConfig.commands = config.commands;
+            // Note: plugins in .claude/config.json format needs conversion to SDK format
+            // SDK expects: plugins: [{ type: 'local', path: './plugin' }]
+            // Config has: plugins: { "plugin-name": { enabled: true, config: {...} } }
+            if (config.plugins && Object.keys(config.plugins).length > 0) {
+                logger.info(`Note: Plugin configuration detected but format conversion not yet implemented`);
+                logger.info(`SDK expects: plugins: [{ type: 'local', path: './plugin' }]`);
+                logger.warn(`Config format: plugins: { "name": { enabled: true, config: {...} } } is not directly supported`);
             }
-            // Create session with the resolved configuration
-            this.session = await unstable_v2_createSession(sessionConfig);
-            logger.info('Claude Agent SDK session initialized successfully');
+            // Create input stream manager
+            this.inputStreamManager = new InputStreamManager();
+            // Create query with streaming input
+            this.query = query({
+                prompt: this.inputStreamManager.stream(),
+                options: queryOptions.options,
+            });
+            // Start processing query responses in the background
+            this.queryProcessorPromise = this.processQuery();
+            logger.info('Claude Agent SDK initialized successfully with v1 API');
         }
         catch (error) {
-            logger.error('Failed to initialize Claude Agent SDK session:', error);
+            logger.error('Failed to initialize Claude Agent SDK:', error);
             throw error;
         }
     }
+    async processQuery() {
+        if (!this.query) {
+            return;
+        }
+        try {
+            for await (const msg of this.query) {
+                await this.processSDKMessage(msg);
+            }
+        }
+        catch (error) {
+            logger.error('Error in query processor:', error);
+            this.setStatus('stable');
+        }
+    }
     async sendMessage(content) {
-        if (!this.session) {
-            throw new Error('Agent session not initialized');
+        if (!this.inputStreamManager) {
+            throw new Error('Agent not initialized');
         }
         if (this.status !== 'stable') {
             throw new Error('Agent is busy');
@@ -68,14 +112,20 @@ export class AgentService {
             const userMessage = this.addMessage('user', content);
             sessionService.broadcastMessageUpdate(userMessage);
             logger.info('Sending message to agent...');
-            await this.session.send(content);
-            // Process agent response
-            logger.info('Receiving agent response...');
-            for await (const msg of this.session.stream()) {
-                await this.processSDKMessage(msg);
-            }
-            this.setStatus('stable');
-            logger.info('Agent processing complete');
+            // Send message through input stream
+            this.inputStreamManager.send({
+                type: 'user',
+                message: {
+                    role: 'user',
+                    content,
+                },
+                parent_tool_use_id: null,
+                session_id: 'default',
+            });
+            // Wait a bit for processing to complete
+            // Note: This is a simple implementation. A production version would
+            // need better synchronization between sending and receiving.
+            await new Promise(resolve => setTimeout(resolve, 100));
         }
         catch (error) {
             logger.error('Error processing message:', error);
@@ -108,10 +158,22 @@ export class AgentService {
                     // Handle special tool uses
                     await this.handleToolUse(toolUse);
                 }
+                // After processing assistant message, set status back to stable
+                this.setStatus('stable');
             }
             else if (msg.type === 'user') {
                 // This might be tool results or other user messages
                 logger.debug('User message from SDK:', msg);
+            }
+            else if (msg.type === 'result') {
+                // Query completed
+                if (msg.subtype === 'success') {
+                    logger.info('Query completed successfully');
+                }
+                else {
+                    logger.warn('Query completed with errors:', msg.errors);
+                }
+                this.setStatus('stable');
             }
         }
         catch (error) {
@@ -214,7 +276,24 @@ export class AgentService {
     }
     async cleanup() {
         logger.info('Cleaning up agent service...');
-        // Add any cleanup logic if needed
+        // Interrupt the query if it's still running
+        if (this.query) {
+            try {
+                await this.query.interrupt();
+            }
+            catch (error) {
+                logger.error('Error interrupting query:', error);
+            }
+        }
+        // Wait for query processor to finish
+        if (this.queryProcessorPromise) {
+            try {
+                await this.queryProcessorPromise;
+            }
+            catch (error) {
+                logger.error('Error waiting for query processor:', error);
+            }
+        }
     }
 }
 export const agentService = new AgentService();

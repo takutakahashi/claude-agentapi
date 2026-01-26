@@ -95,16 +95,24 @@ cp .env.example .env
 ## Configuration
 
 This server supports two configuration methods:
-1. **Claude Code compatible `.claude/config.json`** - For MCP servers, plugins, and skills
+1. **Claude Code compatible `.claude/config.json`** - For MCP servers and hooks
 2. **Environment variables** - For server settings and API credentials
 
 ### Claude Config File (`.claude/config.json`)
 
-This server uses the same configuration structure as Claude Code CLI. Configuration files are loaded in the following order (later configs override earlier ones):
+This server uses the Claude Agent SDK v1 API (`query` function) which supports MCP servers, hooks, and other configurations. Configuration files are loaded in the following order (later configs override earlier ones):
 
 1. **Global**: `~/.claude/config.json`
 2. **Project**: `.claude/config.json` (current working directory)
 3. **Working directory**: `{CLAUDE_WORKING_DIRECTORY}/.claude/config.json`
+
+**Supported Configuration**:
+- ✅ `mcpServers` - MCP server configurations (fully supported)
+- ✅ `hooks` - Hook callbacks for responding to events
+- ⏳ `plugins` / `skills` - Plugin configurations (format conversion needed)
+  - Note: The SDK expects `plugins: [{ type: 'local', path: './plugin' }]`
+  - The config format `plugins: { "name": { enabled: true, config: {...} } }` requires conversion
+- ⏳ `commands` - Custom command configurations (not yet implemented)
 
 #### Example `.claude/config.json`
 
@@ -116,22 +124,13 @@ This server uses the same configuration structure as Claude Code CLI. Configurat
       "args": ["/path/to/mcp-server.js"],
       "env": {
         "API_KEY": "your-api-key"
-      },
-      "disabled": false
-    }
-  },
-  "plugins": {
-    "example-plugin": {
-      "enabled": true,
-      "config": {
-        "option": "value"
       }
     }
   }
 }
 ```
 
-See `.claude/config.json.example` for a complete example.
+See `.claude/config.json.example` for a complete example with all supported options.
 
 #### Configuration Structure
 
