@@ -163,7 +163,7 @@ export class AgentService {
     return `📋 Plan ready for approval:\n${JSON.stringify(input, null, 2)}`;
   }
 
-  private addMessage(role: 'user' | 'assistant', content: string, type?: 'normal' | 'question' | 'plan'): Message {
+  private addMessage(role: 'user' | 'assistant' | 'agent', content: string, type?: 'normal' | 'question' | 'plan'): Message {
     const message: Message = {
       id: this.generateMessageId(),
       role,
@@ -183,8 +183,8 @@ export class AgentService {
     return message;
   }
 
-  private generateMessageId(): string {
-    return `msg_${++this.messageIdCounter}_${Date.now()}`;
+  private generateMessageId(): number {
+    return this.messageIdCounter++;
   }
 
   private setStatus(status: AgentStatus): void {

@@ -86,7 +86,7 @@ describe('SessionService', () => {
       sessionService.subscribe(mockClient);
 
       const message: Message = {
-        id: 'msg_1',
+        id: 0,
         role: 'user',
         content: 'Hello',
         time: '2024-01-01T00:00:00.000Z',
@@ -114,7 +114,7 @@ describe('SessionService', () => {
     it('should send init event to client', () => {
       const messages: Message[] = [
         {
-          id: 'msg_1',
+          id: 0,
           role: 'user',
           content: 'Hello',
           time: '2024-01-01T00:00:00.000Z',

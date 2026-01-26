@@ -152,7 +152,7 @@ export class AgentService {
         return message;
     }
     generateMessageId() {
-        return `msg_${++this.messageIdCounter}_${Date.now()}`;
+        return this.messageIdCounter++;
     }
     setStatus(status) {
         if (this.status !== status) {
