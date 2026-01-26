@@ -35,7 +35,7 @@ describe('GET /status', () => {
   });
 
   it('should return stable status', async () => {
-    vi.mocked(agentService.getStatus).mockReturnValue('stable');
+    (agentService.getStatus as ReturnType<typeof vi.fn>).mockReturnValue('stable');
 
     const response = await request(app).get('/status');
 
@@ -47,7 +47,7 @@ describe('GET /status', () => {
   });
 
   it('should return running status', async () => {
-    vi.mocked(agentService.getStatus).mockReturnValue('running');
+    (agentService.getStatus as ReturnType<typeof vi.fn>).mockReturnValue('running');
 
     const response = await request(app).get('/status');
 
@@ -59,7 +59,7 @@ describe('GET /status', () => {
   });
 
   it('should call agentService.getStatus', async () => {
-    vi.mocked(agentService.getStatus).mockReturnValue('stable');
+    (agentService.getStatus as ReturnType<typeof vi.fn>).mockReturnValue('stable');
 
     await request(app).get('/status');
 
