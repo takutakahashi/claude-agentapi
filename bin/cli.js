@@ -14,6 +14,7 @@ Options:
   -h, --help                         Show this help message
   -w, --working-directory <path>     Set the working directory for the agent
   -p, --permission-mode <mode>       Set permission mode (default|acceptEdits|bypassPermissions)
+  --mcp-config <json|path>           MCP servers configuration (JSON string or file path)
   --dangerously-skip-permissions     Bypass all permission checks (use with caution!)
 
 Environment Variables:
@@ -57,6 +58,12 @@ if (workingDirIndex !== -1 && args[workingDirIndex + 1]) {
 const permissionModeIndex = args.findIndex(arg => arg === '--permission-mode' || arg === '-p');
 if (permissionModeIndex !== -1 && args[permissionModeIndex + 1]) {
   process.env.CLAUDE_PERMISSION_MODE = args[permissionModeIndex + 1];
+}
+
+// Check for --mcp-config option
+const mcpConfigIndex = args.findIndex(arg => arg === '--mcp-config');
+if (mcpConfigIndex !== -1 && args[mcpConfigIndex + 1]) {
+  process.env.CLAUDE_MCP_CONFIG = args[mcpConfigIndex + 1];
 }
 
 // Import and run the main application
