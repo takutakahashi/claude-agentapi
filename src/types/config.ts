@@ -147,6 +147,11 @@ export interface SdkPluginConfig {
 }
 
 /**
+ * Setting source type for loading settings and CLAUDE.md files
+ */
+export type SettingSource = 'user' | 'project' | 'local';
+
+/**
  * Merged configuration with environment variable overrides
  */
 export interface ResolvedConfig {
@@ -168,4 +173,6 @@ export interface ResolvedConfig {
   allowedTools?: string[];
   /** Environment variables */
   env?: Record<string, string>;
+  /** Setting sources for loading CLAUDE.md and settings files */
+  settingSources?: SettingSource[];
 }

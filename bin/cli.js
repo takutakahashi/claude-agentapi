@@ -29,6 +29,8 @@ Environment Variables:
   ANTHROPIC_OAUTH_TOKEN             Anthropic OAuth token
   CLAUDE_WORKING_DIRECTORY          Working directory for the agent
   CLAUDE_PERMISSION_MODE            Permission mode
+  CLAUDE_SETTING_SOURCES            Setting sources for CLAUDE.md (comma-separated: user,project,local)
+                                    (default: user,project - enables CLAUDE.md loading)
   DEBUG                             Enable debug logging
 
 Configuration:
@@ -36,6 +38,12 @@ Configuration:
   1. Global config: ~/.claude/config.json
   2. Project config: .claude/config.json
   3. Working directory config: {workingDirectory}/.claude/config.json
+
+  CLAUDE.md files (project instructions) are loaded from:
+  1. Global: ~/.claude/CLAUDE.md
+  2. Project: .claude/CLAUDE.md
+  3. Working directory: {workingDirectory}/.claude/CLAUDE.md
+  (Requires 'project' in CLAUDE_SETTING_SOURCES, enabled by default)
 
 For more information, visit: https://github.com/takutakahashi/claude-agentapi
 `);
