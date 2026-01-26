@@ -1,4 +1,4 @@
-import { unstable_v2_createSession, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
+import { query, type SDKMessage, type Query, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { Message } from '../types/api.js';
 import type { AgentStatus } from '../types/agent.js';
 import { sessionService } from './session.js';
@@ -8,60 +8,89 @@ import { getMetricsService } from './metrics.js';
 
 const MAX_MESSAGE_HISTORY = parseInt(process.env.MAX_MESSAGE_HISTORY || '100', 10);
 
+// Helper class to manage streaming input
+class InputStreamManager {
+  private resolveNext: ((value: SDKUserMessage) => void) | null = null;
+  private queue: SDKUserMessage[] = [];
+
+  async *stream(): AsyncGenerator<SDKUserMessage> {
+    while (true) {
+      if (this.queue.length > 0) {
+        yield this.queue.shift()!;
+      } else {
+        yield await new Promise<SDKUserMessage>((resolve) => {
+          this.resolveNext = resolve;
+        });
+      }
+    }
+  }
+
+  send(message: SDKUserMessage): void {
+    if (this.resolveNext) {
+      this.resolveNext(message);
+      this.resolveNext = null;
+    } else {
+      this.queue.push(message);
+    }
+  }
+}
+
 export class AgentService {
-  private session: Awaited<ReturnType<typeof unstable_v2_createSession>> | null = null;
+  private query: Query | null = null;
+  private inputStreamManager: InputStreamManager | null = null;
+  private queryProcessorPromise: Promise<void> | null = null;
   private status: AgentStatus = 'stable';
   private messages: Message[] = [];
   private messageIdCounter = 0;
 
   async initialize(): Promise<void> {
     try {
-      logger.info('Initializing Claude Agent SDK session...');
+      logger.info('Initializing Claude Agent SDK with v1 API...');
 
       // Resolve configuration from .claude/config.json and environment variables
       const config = await resolveConfig();
 
       const model = process.env.CLAUDE_MODEL || 'claude-sonnet-4-5-20250929';
 
-      // Build session configuration
-      const sessionConfig: Parameters<typeof unstable_v2_createSession>[0] = {
-        model,
-        workingDirectory: config.workingDirectory,
-        permissionMode: config.permissionMode,
-      } as Parameters<typeof unstable_v2_createSession>[0];
+      // Build query options with v1 API
+      const queryOptions: Parameters<typeof query>[0] = {
+        prompt: '', // Initial empty prompt - we'll use streaming input
+        options: {
+          model,
+          cwd: config.workingDirectory,
+          permissionMode: config.permissionMode,
+        },
+      };
 
       // Add MCP servers if configured
       if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
-        logger.info('Configuring MCP servers...');
-        // Convert our MCPServersConfig to the format expected by the SDK
-        // @ts-expect-error - mcpServers may not be in the type definition yet
-        sessionConfig.mcpServers = config.mcpServers;
-      }
-
-      // Add plugins/skills if configured
-      if (config.plugins && Object.keys(config.plugins).length > 0) {
-        logger.info('Configuring plugins/skills...');
-        // The SDK may have a plugins parameter - we'll pass it through
-        // @ts-expect-error - plugins may not be in the type definition yet
-        sessionConfig.plugins = config.plugins;
+        logger.info(`Configuring ${Object.keys(config.mcpServers).length} MCP server(s)...`);
+        queryOptions.options!.mcpServers = config.mcpServers;
       }
 
       // Add hooks if configured
       if (config.hooks && Object.keys(config.hooks).length > 0) {
-        logger.info('Configuring hooks...');
-        // @ts-expect-error - hooks may not be in the type definition yet
-        sessionConfig.hooks = config.hooks;
+        logger.info(`Configuring ${Object.keys(config.hooks).length} hook(s)...`);
+        queryOptions.options!.hooks = config.hooks;
       }
 
-      // Add commands if configured
-      if (config.commands && Object.keys(config.commands).length > 0) {
-        logger.info('Configuring commands...');
-        // @ts-expect-error - commands may not be in the type definition yet
-        sessionConfig.commands = config.commands;
+      // Add SDK plugins if resolved from settings.json
+      if (config.sdkPlugins && config.sdkPlugins.length > 0) {
+        logger.info(`Configuring ${config.sdkPlugins.length} plugin(s) from settings.json...`);
+        queryOptions.options!.plugins = config.sdkPlugins;
       }
 
-      // Create session with the resolved configuration
-      this.session = await unstable_v2_createSession(sessionConfig);
+      // Create input stream manager
+      this.inputStreamManager = new InputStreamManager();
+
+      // Create query with streaming input
+      this.query = query({
+        prompt: this.inputStreamManager.stream(),
+        options: queryOptions.options,
+      });
+
+      // Start processing query responses in the background
+      this.queryProcessorPromise = this.processQuery();
 
       // Record session start in metrics
       const metricsService = getMetricsService();
@@ -69,16 +98,31 @@ export class AgentService {
         metricsService.recordSessionStart();
       }
 
-      logger.info('Claude Agent SDK session initialized successfully');
+      logger.info('Claude Agent SDK initialized successfully with v1 API');
     } catch (error) {
-      logger.error('Failed to initialize Claude Agent SDK session:', error);
+      logger.error('Failed to initialize Claude Agent SDK:', error);
       throw error;
     }
   }
 
+  private async processQuery(): Promise<void> {
+    if (!this.query) {
+      return;
+    }
+
+    try {
+      for await (const msg of this.query) {
+        await this.processSDKMessage(msg);
+      }
+    } catch (error) {
+      logger.error('Error in query processor:', error);
+      this.setStatus('stable');
+    }
+  }
+
   async sendMessage(content: string): Promise<void> {
-    if (!this.session) {
-      throw new Error('Agent session not initialized');
+    if (!this.inputStreamManager) {
+      throw new Error('Agent not initialized');
     }
 
     if (this.status !== 'stable') {
@@ -93,16 +137,23 @@ export class AgentService {
       sessionService.broadcastMessageUpdate(userMessage);
 
       logger.info('Sending message to agent...');
-      await this.session.send(content);
 
-      // Process agent response
-      logger.info('Receiving agent response...');
-      for await (const msg of this.session.stream()) {
-        await this.processSDKMessage(msg);
-      }
+      // Send message through input stream
+      this.inputStreamManager.send({
+        type: 'user',
+        message: {
+          role: 'user',
+          content,
+        },
+        parent_tool_use_id: null,
+        session_id: 'default',
+      });
 
-      this.setStatus('stable');
-      logger.info('Agent processing complete');
+      // Wait a bit for processing to complete
+      // Note: This is a simple implementation. A production version would
+      // need better synchronization between sending and receiving.
+      await new Promise(resolve => setTimeout(resolve, 100));
+
     } catch (error) {
       logger.error('Error processing message:', error);
       this.setStatus('stable');
@@ -152,9 +203,20 @@ export class AgentService {
           // Handle special tool uses
           await this.handleToolUse(toolUse);
         }
+
+        // After processing assistant message, set status back to stable
+        this.setStatus('stable');
       } else if (msg.type === 'user') {
         // This might be tool results or other user messages
         logger.debug('User message from SDK:', msg);
+      } else if (msg.type === 'result') {
+        // Query completed
+        if (msg.subtype === 'success') {
+          logger.info('Query completed successfully');
+        } else {
+          logger.warn('Query completed with errors:', msg.errors);
+        }
+        this.setStatus('stable');
       }
     } catch (error) {
       logger.error('Error processing SDK message:', error);
@@ -384,6 +446,24 @@ export class AgentService {
 
   async cleanup(): Promise<void> {
     logger.info('Cleaning up agent service...');
+
+    // Interrupt the query if it's still running
+    if (this.query) {
+      try {
+        await this.query.interrupt();
+      } catch (error) {
+        logger.error('Error interrupting query:', error);
+      }
+    }
+
+    // Wait for query processor to finish
+    if (this.queryProcessorPromise) {
+      try {
+        await this.queryProcessorPromise;
+      } catch (error) {
+        logger.error('Error waiting for query processor:', error);
+      }
+    }
 
     // Record session end metrics
     const metricsService = getMetricsService();
