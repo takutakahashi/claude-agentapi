@@ -114,6 +114,16 @@ Use either API Key or OAuth Token (not both):
 - `ANTHROPIC_API_KEY` - Your Anthropic API key
 - `ANTHROPIC_OAUTH_TOKEN` - Your Anthropic OAuth token
 
+#### Agent Permission Configuration
+- `CLAUDE_WORKING_DIRECTORY` - Working directory for the agent (default: current working directory)
+- `CLAUDE_PERMISSION_MODE` - Permission mode: `default`, `acceptEdits`, or `bypassPermissions` (default: default)
+- `DANGEROUSLY_SKIP_PERMISSIONS` - Set to `true` to skip all permission checks (equivalent to `bypassPermissions` mode)
+
+**Permission Modes:**
+- `default` - Standard permission checks with user prompts for confirmations
+- `acceptEdits` - Automatically approve file edits (still prompts for other operations)
+- `bypassPermissions` - Skip all permission checks (⚠️ use with extreme caution)
+
 #### Other Configuration
 - `DEBUG` - Enable debug logging (default: false)
 - `MAX_MESSAGE_HISTORY` - Maximum messages to keep in history (default: 100)
@@ -155,6 +165,44 @@ npm run type-check
 ```bash
 npm run lint
 npm run lint:fix
+```
+
+### CLI Options
+
+The CLI accepts the following command-line options:
+
+#### `--dangerously-skip-permissions`
+Disables all permission checks by setting the permission mode to `bypassPermissions`. This allows the agent to perform any operation without asking for confirmation.
+
+⚠️ **WARNING**: Use this option with extreme caution! The agent will have unrestricted access to your filesystem and can execute any commands without prompts.
+
+```bash
+npx claude-agentapi --dangerously-skip-permissions
+```
+
+#### `--working-directory <path>` or `-w <path>`
+Sets the working directory for the agent. This allows the agent to access files relative to the specified directory, including `.claude` and other configuration directories.
+
+```bash
+npx claude-agentapi --working-directory /path/to/your/project
+# or
+npx claude-agentapi -w /path/to/your/project
+```
+
+#### `--permission-mode <mode>` or `-p <mode>`
+Sets the permission mode for the agent. Valid options are `default`, `acceptEdits`, or `bypassPermissions`.
+
+```bash
+npx claude-agentapi --permission-mode acceptEdits
+# or
+npx claude-agentapi -p acceptEdits
+```
+
+**Example with multiple options:**
+```bash
+npx claude-agentapi \
+  --working-directory /path/to/project \
+  --permission-mode acceptEdits
 ```
 
 ## API Endpoints
