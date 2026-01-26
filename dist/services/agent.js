@@ -1,6 +1,7 @@
 import { unstable_v2_createSession } from '@anthropic-ai/claude-agent-sdk';
 import { sessionService } from './session.js';
 import { logger } from '../utils/logger.js';
+import { resolveConfig } from '../utils/config.js';
 const MAX_MESSAGE_HISTORY = parseInt(process.env.MAX_MESSAGE_HISTORY || '100', 10);
 export class AgentService {
     session = null;
@@ -10,40 +11,30 @@ export class AgentService {
     async initialize() {
         try {
             logger.info('Initializing Claude Agent SDK session...');
+            // Resolve configuration from .claude/config.json and environment variables
+            const config = await resolveConfig();
             const model = process.env.CLAUDE_MODEL || 'claude-sonnet-4-5-20250929';
-            // Configure working directory
-            const workingDirectory = process.env.CLAUDE_WORKING_DIRECTORY || process.cwd();
-            logger.info(`Working directory: ${workingDirectory}`);
-            // Configure permission mode
-            let permissionMode = 'default';
-            // Check for dangerously-skip-permissions flag
-            if (process.env.DANGEROUSLY_SKIP_PERMISSIONS === 'true') {
-                permissionMode = 'bypassPermissions';
-                logger.warn('⚠️  WARNING: All permission checks are disabled (bypassPermissions mode)');
-            }
-            else if (process.env.CLAUDE_PERMISSION_MODE) {
-                // Use the permission mode from environment variable
-                const mode = process.env.CLAUDE_PERMISSION_MODE;
-                if (mode === 'default' || mode === 'acceptEdits' || mode === 'bypassPermissions') {
-                    permissionMode = mode;
-                    logger.info(`Permission mode: ${permissionMode}`);
-                }
-                else {
-                    logger.warn(`Invalid permission mode: ${mode}. Using default.`);
-                }
-            }
-            else {
-                logger.info(`Permission mode: ${permissionMode}`);
-            }
-            // Note: workingDirectory and permissionMode are supported by the SDK
-            // but may not be in the current type definitions
-            this.session = await unstable_v2_createSession({
+            // Build session configuration
+            const sessionConfig = {
                 model,
-                workingDirectory,
-                permissionMode,
-                // Bedrock support is controlled via CLAUDE_CODE_USE_BEDROCK environment variable
-                // Additional configuration can be added here as needed
-            });
+                workingDirectory: config.workingDirectory,
+                permissionMode: config.permissionMode,
+            };
+            // Add MCP servers if configured
+            if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
+                logger.info('Configuring MCP servers...');
+                // Convert our MCPServersConfig to the format expected by the SDK
+                sessionConfig.mcpServers = config.mcpServers;
+            }
+            // Add plugins/skills if configured
+            if (config.plugins && Object.keys(config.plugins).length > 0) {
+                logger.info('Configuring plugins/skills...');
+                // The SDK may have a plugins parameter - we'll pass it through
+                // @ts-expect-error - plugins may not be in the type definition yet
+                sessionConfig.plugins = config.plugins;
+            }
+            // Create session with the resolved configuration
+            this.session = await unstable_v2_createSession(sessionConfig);
             logger.info('Claude Agent SDK session initialized successfully');
         }
         catch (error) {

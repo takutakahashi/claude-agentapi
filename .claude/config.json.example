@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "example-mcp-server": {
+      "command": "node",
+      "args": ["/path/to/mcp-server.js"],
+      "env": {
+        "API_KEY": "your-api-key-here",
+        "DEBUG": "true"
+      },
+      "disabled": false
+    },
+    "another-server": {
+      "command": "python",
+      "args": ["-m", "mcp_server"],
+      "disabled": true
+    }
+  },
+  "plugins": {
+    "example-plugin": {
+      "enabled": true,
+      "config": {
+        "option1": "value1",
+        "option2": true
+      }
+    }
+  },
+  "skills": {
+    "example-skill": {
+      "enabled": true,
+      "config": {
+        "customOption": "customValue"
+      }
+    }
+  }
+}

@@ -12,6 +12,9 @@ This project implements a server compatible with the [coder/agentapi](https://gi
 - ✅ Claude Agent SDK V2 integration
 - ✅ AWS Bedrock support
 - ✅ Anthropic API support (API Key and OAuth Token)
+- ✅ **Claude Code compatible configuration** (`.claude/config.json`)
+- ✅ **MCP (Model Context Protocol) servers support**
+- ✅ **Plugin marketplace support**
 - ✅ Server-Sent Events (SSE) for real-time updates
 - ✅ Multi-turn conversation support
 - ✅ AskUserQuestion and ExitPlanMode tool handling
@@ -90,6 +93,57 @@ cp .env.example .env
 ```
 
 ## Configuration
+
+This server supports two configuration methods:
+1. **Claude Code compatible `.claude/config.json`** - For MCP servers, plugins, and skills
+2. **Environment variables** - For server settings and API credentials
+
+### Claude Config File (`.claude/config.json`)
+
+This server uses the same configuration structure as Claude Code CLI. Configuration files are loaded in the following order (later configs override earlier ones):
+
+1. **Global**: `~/.claude/config.json`
+2. **Project**: `.claude/config.json` (current working directory)
+3. **Working directory**: `{CLAUDE_WORKING_DIRECTORY}/.claude/config.json`
+
+#### Example `.claude/config.json`
+
+```json
+{
+  "mcpServers": {
+    "example-server": {
+      "command": "node",
+      "args": ["/path/to/mcp-server.js"],
+      "env": {
+        "API_KEY": "your-api-key"
+      },
+      "disabled": false
+    }
+  },
+  "plugins": {
+    "example-plugin": {
+      "enabled": true,
+      "config": {
+        "option": "value"
+      }
+    }
+  }
+}
+```
+
+See `.claude/config.json.example` for a complete example.
+
+#### Configuration Structure
+
+- **`mcpServers`**: MCP (Model Context Protocol) server configurations
+  - `command`: Command to execute the MCP server
+  - `args`: Array of command-line arguments
+  - `env`: Environment variables for the server process
+  - `disabled`: Set to `true` to disable a server without removing its configuration
+
+- **`plugins`** / **`skills`**: Plugin/skill configurations
+  - `enabled`: Whether the plugin is enabled
+  - `config`: Plugin-specific configuration object
 
 ### Environment Variables
 
@@ -325,6 +379,61 @@ src/
     ├── logger.ts         # Logging utility
     └── sse.ts            # SSE helper
 ```
+
+## MCP Servers and Plugins
+
+### MCP Servers
+
+This server supports [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers, allowing you to extend Claude's capabilities with custom tools and integrations.
+
+MCP servers are configured in `.claude/config.json` under the `mcpServers` key. Each server configuration includes:
+
+- The command to execute
+- Optional arguments
+- Environment variables
+- An optional `disabled` flag to temporarily disable a server
+
+**Example MCP server configuration:**
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allowed/directory"]
+    },
+    "database": {
+      "command": "docker",
+      "args": ["run", "-i", "my-mcp-db-server"],
+      "env": {
+        "DATABASE_URL": "postgresql://localhost/mydb"
+      }
+    }
+  }
+}
+```
+
+### Plugins and Skills
+
+Plugins extend Claude's functionality with additional capabilities. Configure plugins in `.claude/config.json` under the `plugins` or `skills` key.
+
+**Example plugin configuration:**
+
+```json
+{
+  "plugins": {
+    "code-reviewer": {
+      "enabled": true,
+      "config": {
+        "strictness": "high",
+        "languages": ["typescript", "python"]
+      }
+    }
+  }
+}
+```
+
+**Note:** The `skills` key is an alias for `plugins` and works identically.
 
 ## Special Features
 
