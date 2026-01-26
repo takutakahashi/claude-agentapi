@@ -1,6 +1,10 @@
 # Dependencies
 node_modules/
 
+# Include .claude config example (override global gitignore)
+!.claude/
+!.claude/config.json.example
+
 # Build output
 dist/__tests__/
 

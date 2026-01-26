@@ -12,6 +12,9 @@ This project implements a server compatible with the [coder/agentapi](https://gi
 - ✅ Claude Agent SDK V2 integration
 - ✅ AWS Bedrock support
 - ✅ Anthropic API support (API Key and OAuth Token)
+- ✅ **Claude Code compatible configuration** (`.claude/config.json`)
+- ✅ **MCP (Model Context Protocol) servers support**
+- ✅ **Plugin marketplace support**
 - ✅ Server-Sent Events (SSE) for real-time updates
 - ✅ Multi-turn conversation support
 - ✅ AskUserQuestion and ExitPlanMode tool handling
@@ -90,6 +93,69 @@ cp .env.example .env
 ```
 
 ## Configuration
+
+This server supports two configuration methods:
+1. **Claude Code compatible `.claude/config.json`** - For MCP servers, plugins, and skills
+2. **Environment variables** - For server settings and API credentials
+
+### Claude Config File (`.claude/config.json`)
+
+This server uses the same configuration structure as Claude Code CLI. Configuration files are loaded in the following order (later configs override earlier ones):
+
+1. **Global**: `~/.claude/config.json`
+2. **Project**: `.claude/config.json` (current working directory)
+3. **Working directory**: `{CLAUDE_WORKING_DIRECTORY}/.claude/config.json`
+
+#### Example `.claude/config.json`
+
+```json
+{
+  "mcpServers": {
+    "example-server": {
+      "command": "node",
+      "args": ["/path/to/mcp-server.js"],
+      "env": {
+        "API_KEY": "your-api-key"
+      },
+      "disabled": false
+    }
+  },
+  "plugins": {
+    "example-plugin": {
+      "enabled": true,
+      "config": {
+        "option": "value"
+      }
+    }
+  }
+}
+```
+
+See `.claude/config.json.example` for a complete example.
+
+#### Configuration Structure
+
+- **`mcpServers`**: MCP (Model Context Protocol) server configurations
+  - `command`: Command to execute the MCP server
+  - `args`: Array of command-line arguments
+  - `env`: Environment variables for the server process
+  - `disabled`: Set to `true` to disable a server without removing its configuration
+
+- **`plugins`** / **`skills`**: Plugin/skill configurations
+  - `enabled`: Whether the plugin is enabled
+  - `config`: Plugin-specific configuration object
+
+- **`hooks`**: Hook configurations for executing commands at specific events
+  - `command`: Command to execute when the hook is triggered
+  - `args`: Array of command-line arguments
+  - `env`: Environment variables for the hook process
+  - Common hooks: `user-prompt-submit-hook`, `tool-call-hook`
+
+- **`commands`**: Custom command definitions
+  - `command`: Command to execute
+  - `args`: Array of command-line arguments
+  - `env`: Environment variables for the command process
+  - `description`: Description of what the command does
 
 ### Environment Variables
 
@@ -325,6 +391,118 @@ src/
     ├── logger.ts         # Logging utility
     └── sse.ts            # SSE helper
 ```
+
+## MCP Servers and Plugins
+
+### MCP Servers
+
+This server supports [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers, allowing you to extend Claude's capabilities with custom tools and integrations.
+
+MCP servers are configured in `.claude/config.json` under the `mcpServers` key. Each server configuration includes:
+
+- The command to execute
+- Optional arguments
+- Environment variables
+- An optional `disabled` flag to temporarily disable a server
+
+**Example MCP server configuration:**
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allowed/directory"]
+    },
+    "database": {
+      "command": "docker",
+      "args": ["run", "-i", "my-mcp-db-server"],
+      "env": {
+        "DATABASE_URL": "postgresql://localhost/mydb"
+      }
+    }
+  }
+}
+```
+
+### Plugins and Skills
+
+Plugins extend Claude's functionality with additional capabilities. Configure plugins in `.claude/config.json` under the `plugins` or `skills` key.
+
+**Example plugin configuration:**
+
+```json
+{
+  "plugins": {
+    "code-reviewer": {
+      "enabled": true,
+      "config": {
+        "strictness": "high",
+        "languages": ["typescript", "python"]
+      }
+    }
+  }
+}
+```
+
+**Note:** The `skills` key is an alias for `plugins` and works identically.
+
+### Hooks
+
+Hooks allow you to execute custom commands when specific events occur during agent operation. Configure hooks in `.claude/config.json` under the `hooks` key.
+
+**Example hook configuration:**
+
+```json
+{
+  "hooks": {
+    "user-prompt-submit-hook": {
+      "command": "bash",
+      "args": ["-c", "echo 'User prompt submitted'"],
+      "env": {
+        "HOOK_TYPE": "user-prompt-submit"
+      }
+    },
+    "tool-call-hook": {
+      "command": "node",
+      "args": ["/path/to/tool-call-logger.js"]
+    }
+  }
+}
+```
+
+**Common hook types:**
+- `user-prompt-submit-hook`: Triggered when a user submits a prompt
+- `tool-call-hook`: Triggered when the agent calls a tool
+- And more depending on Claude Agent SDK support
+
+### Custom Commands
+
+Define custom commands that can be invoked during agent operation. Configure commands in `.claude/config.json` under the `commands` key.
+
+**Example command configuration:**
+
+```json
+{
+  "commands": {
+    "deploy": {
+      "command": "bash",
+      "args": ["-c", "npm run deploy"],
+      "description": "Deploy the application to production",
+      "env": {
+        "NODE_ENV": "production"
+      }
+    },
+    "test": {
+      "command": "npm",
+      "args": ["test"],
+      "description": "Run the test suite"
+    }
+  }
+}
+```
+
+Commands can be invoked by the agent or used for custom workflows within your application.
 
 ## Special Features
 

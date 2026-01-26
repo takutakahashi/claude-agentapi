@@ -10,7 +10,8 @@
   "files": [
     "dist",
     "bin",
-    ".env.example"
+    ".env.example",
+    ".claude/config.json.example"
   ],
   "trustedDependencies": [
     "@takutakahashi/claude-agentapi"
