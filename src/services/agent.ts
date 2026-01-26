@@ -86,11 +86,17 @@ export class AgentService {
         }
 
         // Check for tool uses
-        const toolUses = content.filter((block: unknown): block is { type: 'tool_use'; name: string; input: unknown } =>
+        const toolUses = content.filter((block: unknown): block is { type: 'tool_use'; name: string; input: unknown; id?: string } =>
           typeof block === 'object' && block !== null && 'type' in block && block.type === 'tool_use'
         );
 
         for (const toolUse of toolUses) {
+          // Record tool use as agent message
+          const toolUseMessage = this.formatToolUse(toolUse);
+          const agentMessage = this.addMessage('agent', toolUseMessage);
+          sessionService.broadcastMessageUpdate(agentMessage);
+
+          // Handle special tool uses
           await this.handleToolUse(toolUse);
         }
       } else if (msg.type === 'user') {
@@ -118,6 +124,15 @@ export class AgentService {
       sessionService.broadcastMessageUpdate(planMessage);
       logger.info('ExitPlanMode detected and broadcasted');
     }
+  }
+
+  private formatToolUse(toolUse: { name: string; input: unknown; id?: string }): string {
+    return JSON.stringify({
+      type: 'tool_use',
+      name: toolUse.name,
+      id: toolUse.id,
+      input: toolUse.input,
+    }, null, 2);
   }
 
   private formatQuestion(input: unknown): string {

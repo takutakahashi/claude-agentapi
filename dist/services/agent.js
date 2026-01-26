@@ -69,6 +69,11 @@ export class AgentService {
                 // Check for tool uses
                 const toolUses = content.filter((block) => typeof block === 'object' && block !== null && 'type' in block && block.type === 'tool_use');
                 for (const toolUse of toolUses) {
+                    // Record tool use as agent message
+                    const toolUseMessage = this.formatToolUse(toolUse);
+                    const agentMessage = this.addMessage('agent', toolUseMessage);
+                    sessionService.broadcastMessageUpdate(agentMessage);
+                    // Handle special tool uses
                     await this.handleToolUse(toolUse);
                 }
             }
@@ -97,6 +102,14 @@ export class AgentService {
             sessionService.broadcastMessageUpdate(planMessage);
             logger.info('ExitPlanMode detected and broadcasted');
         }
+    }
+    formatToolUse(toolUse) {
+        return JSON.stringify({
+            type: 'tool_use',
+            name: toolUse.name,
+            id: toolUse.id,
+            input: toolUse.input,
+        }, null, 2);
     }
     formatQuestion(input) {
         // Format AskUserQuestion input as readable text

@@ -9,6 +9,7 @@ export declare class AgentService {
     sendMessage(content: string): Promise<void>;
     private processSDKMessage;
     private handleToolUse;
+    private formatToolUse;
     private formatQuestion;
     private formatPlan;
     private addMessage;
