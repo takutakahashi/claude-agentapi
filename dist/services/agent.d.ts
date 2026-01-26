@@ -1,0 +1,22 @@
+import type { Message } from '../types/api.js';
+import type { AgentStatus } from '../types/agent.js';
+export declare class AgentService {
+    private session;
+    private status;
+    private messages;
+    private messageIdCounter;
+    initialize(): Promise<void>;
+    sendMessage(content: string): Promise<void>;
+    private processSDKMessage;
+    private handleToolUse;
+    private formatQuestion;
+    private formatPlan;
+    private addMessage;
+    private generateMessageId;
+    private setStatus;
+    getStatus(): AgentStatus;
+    getMessages(): Message[];
+    cleanup(): Promise<void>;
+}
+export declare const agentService: AgentService;
+//# sourceMappingURL=agent.d.ts.map
