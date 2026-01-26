@@ -2,8 +2,7 @@
 node_modules/
 
 # Build output
-# dist/ - Commented out to allow committing build output for GitHub installs
-dist/__tests__/
+dist/
 
 # Environment variables
 .env
