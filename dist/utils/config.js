@@ -3,11 +3,41 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { logger } from './logger.js';
 /**
+ * Load MCP config from --mcp-config option
+ * Supports both JSON string and file path
+ */
+async function loadMcpConfigFromOption() {
+    const mcpConfigOption = process.env.CLAUDE_MCP_CONFIG;
+    if (!mcpConfigOption) {
+        return null;
+    }
+    try {
+        // First, try to parse as JSON string
+        try {
+            const parsed = JSON.parse(mcpConfigOption);
+            logger.info('Loaded MCP config from --mcp-config (JSON string)');
+            return parsed;
+        }
+        catch {
+            // If not valid JSON, try as file path
+            const content = await readFile(mcpConfigOption, 'utf-8');
+            const parsed = JSON.parse(content);
+            logger.info(`Loaded MCP config from --mcp-config (file): ${mcpConfigOption}`);
+            return parsed;
+        }
+    }
+    catch (error) {
+        logger.error(`Failed to load MCP config from --mcp-config: ${error}`);
+        return null;
+    }
+}
+/**
  * Load Claude configuration from .claude/config.json
  * Checks in order:
  * 1. Global config: ~/.claude/config.json
  * 2. Project config: .claude/config.json (current working directory)
  * 3. Working directory config: {workingDirectory}/.claude/config.json
+ * 4. --mcp-config option (highest priority)
  */
 export async function loadClaudeConfig(workingDirectory) {
     const configs = [];
@@ -37,6 +67,11 @@ export async function loadClaudeConfig(workingDirectory) {
                 logger.info(`Loaded working directory config from: ${workingDirConfigPath}`);
             }
         }
+    }
+    // 4. Load MCP config from --mcp-config option (highest priority)
+    const mcpConfigFromOption = await loadMcpConfigFromOption();
+    if (mcpConfigFromOption) {
+        configs.push({ mcpServers: mcpConfigFromOption });
     }
     // Merge all configs (later configs override earlier ones)
     return mergeConfigs(configs);

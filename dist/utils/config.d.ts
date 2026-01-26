@@ -5,6 +5,7 @@ import type { ClaudeConfig, ResolvedConfig } from '../types/config.js';
  * 1. Global config: ~/.claude/config.json
  * 2. Project config: .claude/config.json (current working directory)
  * 3. Working directory config: {workingDirectory}/.claude/config.json
+ * 4. --mcp-config option (highest priority)
  */
 export declare function loadClaudeConfig(workingDirectory?: string): Promise<ClaudeConfig>;
 /**
