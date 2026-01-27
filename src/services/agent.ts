@@ -6,7 +6,8 @@ import { logger } from '../utils/logger.js';
 import { resolveConfig } from '../utils/config.js';
 import { getMetricsService } from './metrics.js';
 
-const MAX_MESSAGE_HISTORY = parseInt(process.env.MAX_MESSAGE_HISTORY || '100', 10);
+const MAX_MESSAGE_HISTORY = parseInt(process.env.MAX_MESSAGE_HISTORY || '50', 10);
+const MAX_INPUT_QUEUE_SIZE = parseInt(process.env.MAX_INPUT_QUEUE_SIZE || '10', 10);
 
 // Helper class to manage streaming input
 class InputStreamManager {
@@ -31,7 +32,18 @@ class InputStreamManager {
       this.resolveNext = null;
     } else {
       this.queue.push(message);
+      // Limit queue size to prevent memory issues
+      if (this.queue.length > MAX_INPUT_QUEUE_SIZE) {
+        logger.warn(`Input queue size exceeded ${MAX_INPUT_QUEUE_SIZE}, removing oldest message`);
+        this.queue.shift();
+      }
     }
+  }
+
+  clearQueue(): number {
+    const size = this.queue.length;
+    this.queue = [];
+    return size;
   }
 }
 
@@ -544,6 +556,13 @@ export class AgentService {
     return [...this.messages];
   }
 
+  clearMessages(): void {
+    const count = this.messages.length;
+    this.messages = [];
+    this.messageIdCounter = 0;
+    logger.info(`Cleared ${count} messages from memory`);
+  }
+
   async cleanup(): Promise<void> {
     logger.info('Cleaning up agent service...');
 
@@ -563,6 +582,13 @@ export class AgentService {
       } catch (error) {
         logger.error('Error waiting for query processor:', error);
       }
+    }
+
+    // Clear messages and input queue
+    this.clearMessages();
+    if (this.inputStreamManager) {
+      const queueSize = this.inputStreamManager.clearQueue();
+      logger.info(`Cleared ${queueSize} items from input queue`);
     }
 
     // Record session end metrics

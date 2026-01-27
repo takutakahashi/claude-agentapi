@@ -1,9 +1,16 @@
 import { logger } from '../utils/logger.js';
+const CLIENT_TIMEOUT_MS = parseInt(process.env.CLIENT_TIMEOUT_MS || '300000', 10); // 5 minutes default
+const CLEANUP_INTERVAL_MS = parseInt(process.env.CLEANUP_INTERVAL_MS || '60000', 10); // 1 minute default
 export class SessionService {
     subscribers = new Map();
+    cleanupTimer = null;
     subscribe(client) {
         this.subscribers.set(client.id, client);
         logger.info(`SSE client ${client.id} subscribed (total: ${this.subscribers.size})`);
+        // Start cleanup timer if not already running
+        if (!this.cleanupTimer) {
+            this.startCleanupTimer();
+        }
     }
     unsubscribe(clientId) {
         const client = this.subscribers.get(clientId);
@@ -43,6 +50,46 @@ export class SessionService {
     }
     getSubscriberCount() {
         return this.subscribers.size;
+    }
+    startCleanupTimer() {
+        this.cleanupTimer = setInterval(() => {
+            this.cleanupStaleClients();
+        }, CLEANUP_INTERVAL_MS);
+        logger.info(`Started SSE client cleanup timer (interval: ${CLEANUP_INTERVAL_MS}ms, timeout: ${CLIENT_TIMEOUT_MS}ms)`);
+    }
+    cleanupStaleClients() {
+        const now = Date.now();
+        const staleClients = [];
+        this.subscribers.forEach((client, id) => {
+            // Type guard to check if client has lastActivityTime property
+            if ('lastActivityTime' in client && typeof client.lastActivityTime === 'number') {
+                if (now - client.lastActivityTime > CLIENT_TIMEOUT_MS) {
+                    staleClients.push(id);
+                }
+            }
+            // Also check if client is closed
+            if ('isClosed' in client && typeof client.isClosed === 'function' && client.isClosed()) {
+                staleClients.push(id);
+            }
+        });
+        if (staleClients.length > 0) {
+            logger.info(`Cleaning up ${staleClients.length} stale SSE client(s)`);
+            staleClients.forEach(id => this.unsubscribe(id));
+        }
+        // Stop cleanup timer if no subscribers
+        if (this.subscribers.size === 0 && this.cleanupTimer) {
+            clearInterval(this.cleanupTimer);
+            this.cleanupTimer = null;
+            logger.info('Stopped SSE client cleanup timer (no subscribers)');
+        }
+    }
+    cleanup() {
+        if (this.cleanupTimer) {
+            clearInterval(this.cleanupTimer);
+            this.cleanupTimer = null;
+        }
+        this.subscribers.clear();
+        logger.info('SessionService cleaned up');
     }
 }
 export const sessionService = new SessionService();

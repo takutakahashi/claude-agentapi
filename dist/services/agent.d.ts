@@ -23,6 +23,7 @@ export declare class AgentService {
     private setStatus;
     getStatus(): AgentStatus;
     getMessages(): Message[];
+    clearMessages(): void;
     cleanup(): Promise<void>;
 }
 export declare const agentService: AgentService;

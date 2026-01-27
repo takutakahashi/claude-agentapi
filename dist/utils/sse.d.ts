@@ -4,6 +4,7 @@ export declare class SSEClientImpl implements SSEClient {
     readonly id: string;
     private res;
     private closed;
+    lastActivityTime: number;
     constructor(id: string, res: Response);
     send(event: string, data: unknown): void;
     close(): void;

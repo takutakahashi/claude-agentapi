@@ -3,6 +3,7 @@ export class SSEClientImpl {
     id;
     res;
     closed = false;
+    lastActivityTime = Date.now();
     constructor(id, res) {
         this.id = id;
         this.res = res;
@@ -25,6 +26,7 @@ export class SSEClientImpl {
         try {
             const dataString = JSON.stringify(data);
             this.res.write(`event: ${event}\ndata: ${dataString}\n\n`);
+            this.lastActivityTime = Date.now();
         }
         catch (error) {
             logger.error(`Error sending SSE event to client ${this.id}:`, error);

@@ -2,6 +2,7 @@ import type { SSEClient } from '../types/agent.js';
 import type { Message } from '../types/api.js';
 export declare class SessionService {
     private subscribers;
+    private cleanupTimer;
     subscribe(client: SSEClient): void;
     unsubscribe(clientId: string): void;
     broadcast(event: string, data: unknown): void;
@@ -9,6 +10,9 @@ export declare class SessionService {
     broadcastStatusChange(status: 'running' | 'stable'): void;
     sendInitialState(client: SSEClient, messages: Message[], status: 'running' | 'stable'): void;
     getSubscriberCount(): number;
+    private startCleanupTimer;
+    private cleanupStaleClients;
+    cleanup(): void;
 }
 export declare const sessionService: SessionService;
 //# sourceMappingURL=session.d.ts.map
