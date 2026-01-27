@@ -16,6 +16,10 @@ export const MessagesResponseBodySchema = z.object({
     $schema: z.string().optional(),
     messages: z.array(MessageSchema),
 });
+export const ToolStatusResponseBodySchema = z.object({
+    $schema: z.string().optional(),
+    toolExecutions: z.array(MessageSchema),
+});
 export const PostMessageRequestSchema = z.object({
     content: z.string(),
     type: z.enum(['user', 'raw']),

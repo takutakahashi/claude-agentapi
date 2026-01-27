@@ -1,0 +1,313 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Claude AgentAPI",
+    "description": "coder/agentapi compatible HTTP API server using Claude Agent SDK on AWS Bedrock",
+    "version": "1.0.0",
+    "license": {
+      "name": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:9000",
+      "description": "Local development server"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "description": "Returns the health status of the server",
+        "responses": {
+          "200": {
+            "description": "Server is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/status": {
+      "get": {
+        "summary": "Get agent status",
+        "description": "Returns the current status of the Claude agent",
+        "responses": {
+          "200": {
+            "description": "Agent status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/messages": {
+      "get": {
+        "summary": "Get conversation messages",
+        "description": "Returns only user and assistant messages (pure conversation without tool execution information)",
+        "responses": {
+          "200": {
+            "description": "Messages retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagesResponseBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/message": {
+      "post": {
+        "summary": "Send a message to the agent",
+        "description": "Sends a message to the Claude agent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Message sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostMessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemJson"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Agent is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemJson"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tool_status": {
+      "get": {
+        "summary": "Get tool execution status",
+        "description": "Returns information about tool executions (agent and tool_result role messages)",
+        "responses": {
+          "200": {
+            "description": "Tool execution status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolStatusResponseBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events": {
+      "get": {
+        "summary": "Server-Sent Events endpoint",
+        "description": "Subscribe to real-time updates via Server-Sent Events",
+        "responses": {
+          "200": {
+            "description": "SSE connection established",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Message": {
+        "type": "object",
+        "required": ["id", "role", "content", "time"],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unique message ID"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["user", "assistant", "agent", "tool_result"],
+            "description": "Message role"
+          },
+          "content": {
+            "type": "string",
+            "description": "Message content"
+          },
+          "time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["normal", "question", "plan"],
+            "description": "Message type (optional)"
+          },
+          "toolUseId": {
+            "type": "string",
+            "description": "ID of tool_use (for 'agent' role messages)"
+          },
+          "parentToolUseId": {
+            "type": "string",
+            "description": "ID of parent tool_use (for 'tool_result' role messages)"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["success", "error"],
+            "description": "Execution status (for 'tool_result' role messages)"
+          },
+          "error": {
+            "type": "string",
+            "description": "Error message (for 'tool_result' role messages with status='error')"
+          }
+        }
+      },
+      "MessagesResponseBody": {
+        "type": "object",
+        "required": ["messages"],
+        "properties": {
+          "$schema": {
+            "type": "string",
+            "description": "JSON Schema URI (optional)"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            },
+            "description": "Array of user and assistant messages only"
+          }
+        }
+      },
+      "ToolStatusResponseBody": {
+        "type": "object",
+        "required": ["toolExecutions"],
+        "properties": {
+          "$schema": {
+            "type": "string",
+            "description": "JSON Schema URI (optional)"
+          },
+          "toolExecutions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            },
+            "description": "Array of tool execution messages (agent and tool_result roles)"
+          }
+        }
+      },
+      "PostMessageRequest": {
+        "type": "object",
+        "required": ["content", "type"],
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Message content"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["user", "raw"],
+            "description": "Message type"
+          }
+        }
+      },
+      "PostMessageResponse": {
+        "type": "object",
+        "required": ["ok"],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the message was sent successfully"
+          }
+        }
+      },
+      "StatusResponse": {
+        "type": "object",
+        "required": ["agent_type", "status"],
+        "properties": {
+          "agent_type": {
+            "type": "string",
+            "description": "Type of the agent"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["running", "stable"],
+            "description": "Current agent status"
+          }
+        }
+      },
+      "ProblemJson": {
+        "type": "object",
+        "required": ["type", "title", "status"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "A URI reference that identifies the problem type"
+          },
+          "title": {
+            "type": "string",
+            "description": "A short, human-readable summary of the problem"
+          },
+          "status": {
+            "type": "integer",
+            "description": "The HTTP status code"
+          },
+          "detail": {
+            "type": "string",
+            "description": "A human-readable explanation specific to this occurrence"
+          },
+          "instance": {
+            "type": "string",
+            "description": "A URI reference that identifies the specific occurrence"
+          }
+        }
+      }
+    }
+  }
+}
