@@ -6,6 +6,7 @@ export declare class AgentService {
     private queryProcessorPromise;
     private status;
     private messages;
+    private activeToolExecutions;
     private messageIdCounter;
     initialize(): Promise<void>;
     private processQuery;
@@ -23,6 +24,7 @@ export declare class AgentService {
     private setStatus;
     getStatus(): AgentStatus;
     getMessages(): Message[];
+    getActiveToolExecutions(): Message[];
     cleanup(): Promise<void>;
 }
 export declare const agentService: AgentService;
