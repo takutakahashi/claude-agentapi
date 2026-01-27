@@ -5,6 +5,7 @@ export declare const MessageSchema: z.ZodObject<{
         user: "user";
         assistant: "assistant";
         agent: "agent";
+        tool_result: "tool_result";
     }>;
     content: z.ZodString;
     time: z.ZodString;
@@ -13,6 +14,13 @@ export declare const MessageSchema: z.ZodObject<{
         question: "question";
         plan: "plan";
     }>>;
+    toolUseId: z.ZodOptional<z.ZodString>;
+    parentToolUseId: z.ZodOptional<z.ZodString>;
+    status: z.ZodOptional<z.ZodEnum<{
+        success: "success";
+        error: "error";
+    }>>;
+    error: z.ZodOptional<z.ZodString>;
 }, z.core.$strip>;
 export type Message = z.infer<typeof MessageSchema>;
 export declare const MessagesResponseBodySchema: z.ZodObject<{
@@ -23,6 +31,7 @@ export declare const MessagesResponseBodySchema: z.ZodObject<{
             user: "user";
             assistant: "assistant";
             agent: "agent";
+            tool_result: "tool_result";
         }>;
         content: z.ZodString;
         time: z.ZodString;
@@ -31,6 +40,13 @@ export declare const MessagesResponseBodySchema: z.ZodObject<{
             question: "question";
             plan: "plan";
         }>>;
+        toolUseId: z.ZodOptional<z.ZodString>;
+        parentToolUseId: z.ZodOptional<z.ZodString>;
+        status: z.ZodOptional<z.ZodEnum<{
+            success: "success";
+            error: "error";
+        }>>;
+        error: z.ZodOptional<z.ZodString>;
     }, z.core.$strip>>;
 }, z.core.$strip>;
 export type MessagesResponseBody = z.infer<typeof MessagesResponseBodySchema>;

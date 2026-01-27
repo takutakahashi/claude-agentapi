@@ -218,7 +218,9 @@ export class AgentService {
         for (const toolUse of toolUses) {
           // Record tool use as agent message
           const toolUseMessage = this.formatToolUse(toolUse);
-          const agentMessage = this.addMessage('agent', toolUseMessage);
+          const agentMessage = this.addMessage('agent', toolUseMessage, undefined, {
+            toolUseId: toolUse.id,
+          });
           sessionService.broadcastMessageUpdate(agentMessage);
 
           // Record tool metrics
@@ -231,8 +233,46 @@ export class AgentService {
         // After processing assistant message, set status back to stable
         this.setStatus('stable');
       } else if (msg.type === 'user') {
-        // This might be tool results or other user messages
-        logger.debug('User message from SDK:', msg);
+        // Process tool results from SDK
+        const content = msg.message?.content || [];
+        const toolResults = content.filter((block: unknown): block is {
+          type: 'tool_result';
+          tool_use_id: string;
+          content: unknown;
+          is_error?: boolean;
+        } =>
+          typeof block === 'object' && block !== null && 'type' in block && block.type === 'tool_result'
+        );
+
+        for (const toolResult of toolResults) {
+          // Format tool result content
+          let resultContent = '';
+          if (typeof toolResult.content === 'string') {
+            resultContent = toolResult.content;
+          } else if (Array.isArray(toolResult.content)) {
+            // Extract text from content blocks
+            const textBlocks = toolResult.content.filter((block: unknown): block is { type: 'text'; text: string } =>
+              typeof block === 'object' && block !== null && 'type' in block && block.type === 'text'
+            );
+            resultContent = textBlocks.map((block: { type: 'text'; text: string }) => block.text).join('\n');
+          } else if (toolResult.content && typeof toolResult.content === 'object') {
+            resultContent = JSON.stringify(toolResult.content, null, 2);
+          }
+
+          // Record tool result as tool_result message
+          const toolResultMessage = this.addMessage('tool_result', resultContent, undefined, {
+            parentToolUseId: toolResult.tool_use_id,
+            status: toolResult.is_error ? 'error' : 'success',
+            error: toolResult.is_error ? resultContent : undefined,
+          });
+          sessionService.broadcastMessageUpdate(toolResultMessage);
+          logger.debug('Tool result recorded:', { tool_use_id: toolResult.tool_use_id, status: toolResultMessage.status });
+        }
+
+        // Log other user messages
+        if (toolResults.length === 0) {
+          logger.debug('User message from SDK (non-tool-result):', msg);
+        }
       } else if (msg.type === 'result') {
         // Query completed
         if (msg.subtype === 'success') {
@@ -453,13 +493,24 @@ export class AgentService {
     }
   }
 
-  private addMessage(role: 'user' | 'assistant' | 'agent', content: string, type?: 'normal' | 'question' | 'plan'): Message {
+  private addMessage(
+    role: 'user' | 'assistant' | 'agent' | 'tool_result',
+    content: string,
+    type?: 'normal' | 'question' | 'plan',
+    options?: {
+      toolUseId?: string;
+      parentToolUseId?: string;
+      status?: 'success' | 'error';
+      error?: string;
+    }
+  ): Message {
     const message: Message = {
       id: this.generateMessageId(),
       role,
       content,
       time: new Date().toISOString(),
       type: type || 'normal',
+      ...options,
     };
 
     this.messages.push(message);
