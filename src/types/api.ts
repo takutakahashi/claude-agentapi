@@ -26,7 +26,7 @@ export type MessagesResponseBody = z.infer<typeof MessagesResponseBodySchema>;
 
 export const ToolStatusResponseBodySchema = z.object({
   $schema: z.string().optional(),
-  toolExecutions: z.array(MessageSchema),
+  messages: z.array(MessageSchema),
 });
 
 export type ToolStatusResponseBody = z.infer<typeof ToolStatusResponseBodySchema>;

@@ -52,7 +52,7 @@ export declare const MessagesResponseBodySchema: z.ZodObject<{
 export type MessagesResponseBody = z.infer<typeof MessagesResponseBodySchema>;
 export declare const ToolStatusResponseBodySchema: z.ZodObject<{
     $schema: z.ZodOptional<z.ZodString>;
-    toolExecutions: z.ZodArray<z.ZodObject<{
+    messages: z.ZodArray<z.ZodObject<{
         id: z.ZodNumber;
         role: z.ZodEnum<{
             user: "user";

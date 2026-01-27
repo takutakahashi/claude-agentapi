@@ -125,11 +125,11 @@
     },
     "/tool_status": {
       "get": {
-        "summary": "Get tool execution status",
-        "description": "Returns information about tool executions (agent and tool_result role messages)",
+        "summary": "Get active tool execution status",
+        "description": "Returns information about currently active tool executions. When a tool starts executing, it appears in this list. When the tool completes (success or error), it is removed from the list.",
         "responses": {
           "200": {
-            "description": "Tool execution status retrieved successfully",
+            "description": "Active tool execution status retrieved successfully",
             "content": {
               "application/json": {
                 "schema": {
@@ -227,18 +227,18 @@
       },
       "ToolStatusResponseBody": {
         "type": "object",
-        "required": ["toolExecutions"],
+        "required": ["messages"],
         "properties": {
           "$schema": {
             "type": "string",
             "description": "JSON Schema URI (optional)"
           },
-          "toolExecutions": {
+          "messages": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Message"
             },
-            "description": "Array of tool execution messages (agent and tool_result roles)"
+            "description": "Array of currently active tool execution messages (agent role only, removed when tool completes)"
           }
         }
       },

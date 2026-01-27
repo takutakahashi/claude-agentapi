@@ -18,7 +18,7 @@ export const MessagesResponseBodySchema = z.object({
 });
 export const ToolStatusResponseBodySchema = z.object({
     $schema: z.string().optional(),
-    toolExecutions: z.array(MessageSchema),
+    messages: z.array(MessageSchema),
 });
 export const PostMessageRequestSchema = z.object({
     content: z.string(),

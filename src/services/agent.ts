@@ -41,6 +41,7 @@ export class AgentService {
   private queryProcessorPromise: Promise<void> | null = null;
   private status: AgentStatus = 'stable';
   private messages: Message[] = [];
+  private activeToolExecutions: Message[] = [];
   private messageIdCounter = 0;
 
   async initialize(): Promise<void> {
@@ -223,6 +224,9 @@ export class AgentService {
           });
           sessionService.broadcastMessageUpdate(agentMessage);
 
+          // Add to active tool executions
+          this.activeToolExecutions.push(agentMessage);
+
           // Record tool metrics
           this.recordToolMetrics(toolUse.name, toolUse.input);
 
@@ -264,6 +268,11 @@ export class AgentService {
           });
           sessionService.broadcastMessageUpdate(toolResultMessage);
           logger.debug('Tool result recorded:', { tool_use_id: toolResult.tool_use_id, status: toolResultMessage.status });
+
+          // Remove corresponding agent message from active tool executions
+          this.activeToolExecutions = this.activeToolExecutions.filter(
+            msg => msg.toolUseId !== toolResult.tool_use_id
+          );
         }
 
         // Log other user messages
@@ -539,6 +548,10 @@ export class AgentService {
 
   getMessages(): Message[] {
     return [...this.messages];
+  }
+
+  getActiveToolExecutions(): Message[] {
+    return [...this.activeToolExecutions];
   }
 
   async cleanup(): Promise<void> {

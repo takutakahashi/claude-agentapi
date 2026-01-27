@@ -240,7 +240,7 @@ describe('API Types', () => {
     it('should validate tool status response with schema', () => {
       const validResponse = {
         $schema: 'https://10.42.2.198:9000/schemas/ToolStatusResponseBody.json',
-        toolExecutions: [
+        messages: [
           {
             id: 0,
             content: 'Tool use',
@@ -250,11 +250,10 @@ describe('API Types', () => {
           },
           {
             id: 1,
-            content: 'Tool result',
-            role: 'tool_result',
+            content: 'Another tool use',
+            role: 'agent',
             time: '2026-01-26T07:56:40.357019866Z',
-            parentToolUseId: 'tool123',
-            status: 'success',
+            toolUseId: 'tool456',
           },
         ],
       };
@@ -265,7 +264,7 @@ describe('API Types', () => {
 
     it('should validate tool status response without schema', () => {
       const validResponse = {
-        toolExecutions: [
+        messages: [
           {
             id: 0,
             content: 'Tool use',
@@ -279,24 +278,15 @@ describe('API Types', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should validate error status in tool result', () => {
+    it('should validate active tool execution (agent role only)', () => {
       const validResponse = {
-        toolExecutions: [
+        messages: [
           {
             id: 0,
             content: 'Tool use',
             role: 'agent',
             time: '2026-01-26T07:56:36.432498007Z',
-            toolUseId: 'tool456',
-          },
-          {
-            id: 1,
-            content: 'Tool failed',
-            role: 'tool_result',
-            time: '2026-01-26T07:56:40.357019866Z',
-            parentToolUseId: 'tool456',
-            status: 'error',
-            error: 'Tool execution failed',
+            toolUseId: 'tool789',
           },
         ],
       };
@@ -305,9 +295,9 @@ describe('API Types', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should reject invalid toolExecutions array', () => {
+    it('should reject invalid messages array', () => {
       const invalidResponse = {
-        toolExecutions: 'not an array',
+        messages: 'not an array',
       };
 
       const result = ToolStatusResponseBodySchema.safeParse(invalidResponse);
