@@ -189,8 +189,6 @@ export class AgentService {
                     // Handle special tool uses
                     await this.handleToolUse(toolUse);
                 }
-                // After processing assistant message, set status back to stable
-                this.setStatus('stable');
             }
             else if (msg.type === 'user') {
                 // Process tool results from SDK
