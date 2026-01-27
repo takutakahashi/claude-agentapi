@@ -50,6 +50,33 @@ export declare const MessagesResponseBodySchema: z.ZodObject<{
     }, z.core.$strip>>;
 }, z.core.$strip>;
 export type MessagesResponseBody = z.infer<typeof MessagesResponseBodySchema>;
+export declare const ToolStatusResponseBodySchema: z.ZodObject<{
+    $schema: z.ZodOptional<z.ZodString>;
+    toolExecutions: z.ZodArray<z.ZodObject<{
+        id: z.ZodNumber;
+        role: z.ZodEnum<{
+            user: "user";
+            assistant: "assistant";
+            agent: "agent";
+            tool_result: "tool_result";
+        }>;
+        content: z.ZodString;
+        time: z.ZodString;
+        type: z.ZodOptional<z.ZodEnum<{
+            normal: "normal";
+            question: "question";
+            plan: "plan";
+        }>>;
+        toolUseId: z.ZodOptional<z.ZodString>;
+        parentToolUseId: z.ZodOptional<z.ZodString>;
+        status: z.ZodOptional<z.ZodEnum<{
+            success: "success";
+            error: "error";
+        }>>;
+        error: z.ZodOptional<z.ZodString>;
+    }, z.core.$strip>>;
+}, z.core.$strip>;
+export type ToolStatusResponseBody = z.infer<typeof ToolStatusResponseBodySchema>;
 export declare const PostMessageRequestSchema: z.ZodObject<{
     content: z.ZodString;
     type: z.ZodEnum<{

@@ -78,4 +78,45 @@ describe('GET /messages', () => {
 
     expect(agentService.getMessages).toHaveBeenCalledOnce();
   });
+
+  it('should filter out agent and tool_result messages', async () => {
+    const mockMessages: Message[] = [
+      {
+        id: 0,
+        role: 'user',
+        content: 'Hello',
+        time: '2024-01-01T00:00:00.000Z',
+      },
+      {
+        id: 1,
+        role: 'assistant',
+        content: 'Hi there!',
+        time: '2024-01-01T00:00:01.000Z',
+      },
+      {
+        id: 2,
+        role: 'agent',
+        content: 'Tool use message',
+        time: '2024-01-01T00:00:02.000Z',
+        toolUseId: 'tool123',
+      },
+      {
+        id: 3,
+        role: 'tool_result',
+        content: 'Tool result',
+        time: '2024-01-01T00:00:03.000Z',
+        parentToolUseId: 'tool123',
+        status: 'success',
+      },
+    ];
+
+    (agentService.getMessages as ReturnType<typeof vi.fn>).mockReturnValue(mockMessages);
+
+    const response = await request(app).get('/messages');
+
+    expect(response.status).toBe(200);
+    expect(response.body.messages).toHaveLength(2);
+    expect(response.body.messages[0].role).toBe('user');
+    expect(response.body.messages[1].role).toBe('assistant');
+  });
 });
