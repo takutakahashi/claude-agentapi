@@ -4,10 +4,15 @@ import { z } from 'zod';
 
 export const MessageSchema = z.object({
   id: z.number(),
-  role: z.enum(['user', 'assistant', 'agent']),
+  role: z.enum(['user', 'assistant', 'agent', 'tool_result']),
   content: z.string(),
   time: z.string(), // ISO 8601 timestamp
   type: z.enum(['normal', 'question', 'plan']).optional(),
+  // Tool execution tracking fields
+  toolUseId: z.string().optional(), // ID of tool_use (for 'agent' role messages)
+  parentToolUseId: z.string().optional(), // ID of parent tool_use (for 'tool_result' role messages)
+  status: z.enum(['success', 'error']).optional(), // Execution status (for 'tool_result' role messages)
+  error: z.string().optional(), // Error message (for 'tool_result' role messages with status='error')
 });
 
 export type Message = z.infer<typeof MessageSchema>;
