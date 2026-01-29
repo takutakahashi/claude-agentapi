@@ -43,6 +43,7 @@ export class AgentService {
   private messages: Message[] = [];
   private activeToolExecutions: Message[] = [];
   private messageIdCounter = 0;
+  private pendingQuestionToolUseId: string | null = null;
 
   async initialize(): Promise<void> {
     try {
@@ -189,25 +190,38 @@ export class AgentService {
       throw new Error('No active question to answer');
     }
 
+    if (!this.pendingQuestionToolUseId) {
+      throw new Error('No pending question to answer');
+    }
+
     try {
-      logger.info('Sending action response to agent...', { answers });
+      const toolUseId = this.pendingQuestionToolUseId;
+      logger.info('Sending action response to agent...', { answers, tool_use_id: toolUseId });
 
       // Add user message to history for tracking
       const answerText = `Answers: ${JSON.stringify(answers, null, 2)}`;
       const userMessage = this.addMessage('user', answerText);
       sessionService.broadcastMessageUpdate(userMessage);
 
-      // Send answer through input stream
-      // The SDK expects answers to be passed via the AskUserQuestion tool's response mechanism
+      // Send answer as tool_result through input stream
       this.inputStreamManager.send({
         type: 'user',
         message: {
           role: 'user',
-          content: answerText,
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: toolUseId,
+              content: JSON.stringify({ answers }),
+            },
+          ],
         },
         parent_tool_use_id: null,
         session_id: 'default',
       });
+
+      // Clear the pending question
+      this.pendingQuestionToolUseId = null;
 
       // Wait a bit for processing to complete
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -356,15 +370,18 @@ export class AgentService {
     }
   }
 
-  private async handleToolUse(toolUse: { name: string; input: unknown }): Promise<void> {
-    const { name, input } = toolUse;
+  private async handleToolUse(toolUse: { name: string; input: unknown; id?: string }): Promise<void> {
+    const { name, input, id } = toolUse;
 
     if (name === 'AskUserQuestion') {
+      // Save the tool_use_id for later response
+      this.pendingQuestionToolUseId = id || null;
+
       // Format as a question message
       const questionText = this.formatQuestion(input);
       const questionMessage = this.addMessage('assistant', questionText, 'question');
       sessionService.broadcastMessageUpdate(questionMessage);
-      logger.info('AskUserQuestion detected and broadcasted');
+      logger.info('AskUserQuestion detected and broadcasted', { tool_use_id: id });
     } else if (name === 'ExitPlanMode') {
       // Format as a plan message
       const planText = this.formatPlan(input);
