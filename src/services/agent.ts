@@ -6,7 +6,7 @@ import { logger } from '../utils/logger.js';
 import { resolveConfig } from '../utils/config.js';
 import { getMetricsService } from './metrics.js';
 
-const MAX_MESSAGE_HISTORY = parseInt(process.env.MAX_MESSAGE_HISTORY || '100', 10);
+const MAX_MESSAGE_HISTORY = parseInt(process.env.MAX_MESSAGE_HISTORY || '100000', 10);
 
 // Helper class to manage streaming input
 class InputStreamManager {
