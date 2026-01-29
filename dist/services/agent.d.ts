@@ -11,6 +11,7 @@ export declare class AgentService {
     initialize(): Promise<void>;
     private processQuery;
     sendMessage(content: string): Promise<void>;
+    sendAction(answers: Record<string, string>): Promise<void>;
     private processSDKMessage;
     private handleSystemMessage;
     private handleToolUse;

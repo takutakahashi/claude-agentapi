@@ -119,4 +119,12 @@ export interface InitEvent {
     messages: Message[];
     status: 'running' | 'stable';
 }
+export declare const PostActionRequestSchema: z.ZodObject<{
+    answers: z.ZodRecord<z.ZodString, z.ZodString>;
+}, z.core.$strip>;
+export type PostActionRequest = z.infer<typeof PostActionRequestSchema>;
+export declare const PostActionResponseSchema: z.ZodObject<{
+    ok: z.ZodBoolean;
+}, z.core.$strip>;
+export type PostActionResponse = z.infer<typeof PostActionResponseSchema>;
 //# sourceMappingURL=api.d.ts.map

@@ -81,3 +81,16 @@ export interface InitEvent {
   messages: Message[];
   status: 'running' | 'stable';
 }
+
+// Action request schema for answering AskUserQuestion
+export const PostActionRequestSchema = z.object({
+  answers: z.record(z.string(), z.string()),
+});
+
+export type PostActionRequest = z.infer<typeof PostActionRequestSchema>;
+
+export const PostActionResponseSchema = z.object({
+  ok: z.boolean(),
+});
+
+export type PostActionResponse = z.infer<typeof PostActionResponseSchema>;

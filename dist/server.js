@@ -4,6 +4,7 @@ import messagesRouter from './routes/messages.js';
 import messageRouter from './routes/message.js';
 import eventsRouter from './routes/events.js';
 import toolStatusRouter from './routes/tool_status.js';
+import actionRouter from './routes/action.js';
 import { logger } from './utils/logger.js';
 export function createServer() {
     const app = express();
@@ -25,6 +26,7 @@ export function createServer() {
     app.use(messageRouter);
     app.use(eventsRouter);
     app.use(toolStatusRouter);
+    app.use(actionRouter);
     // 404 handler
     app.use((_req, res) => {
         res.status(404).json({

@@ -3,7 +3,7 @@ import { sessionService } from './session.js';
 import { logger } from '../utils/logger.js';
 import { resolveConfig } from '../utils/config.js';
 import { getMetricsService } from './metrics.js';
-const MAX_MESSAGE_HISTORY = parseInt(process.env.MAX_MESSAGE_HISTORY || '100', 10);
+const MAX_MESSAGE_HISTORY = parseInt(process.env.MAX_MESSAGE_HISTORY || '100000', 10);
 // Helper class to manage streaming input
 class InputStreamManager {
     resolveNext = null;
@@ -149,6 +149,38 @@ export class AgentService {
         catch (error) {
             logger.error('Error processing message:', error);
             this.setStatus('stable');
+            throw error;
+        }
+    }
+    async sendAction(answers) {
+        if (!this.inputStreamManager) {
+            throw new Error('Agent not initialized');
+        }
+        if (this.status !== 'running') {
+            throw new Error('No active question to answer');
+        }
+        try {
+            logger.info('Sending action response to agent...', { answers });
+            // Add user message to history for tracking
+            const answerText = `Answers: ${JSON.stringify(answers, null, 2)}`;
+            const userMessage = this.addMessage('user', answerText);
+            sessionService.broadcastMessageUpdate(userMessage);
+            // Send answer through input stream
+            // The SDK expects answers to be passed via the AskUserQuestion tool's response mechanism
+            this.inputStreamManager.send({
+                type: 'user',
+                message: {
+                    role: 'user',
+                    content: answerText,
+                },
+                parent_tool_use_id: null,
+                session_id: 'default',
+            });
+            // Wait a bit for processing to complete
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        catch (error) {
+            logger.error('Error processing action:', error);
             throw error;
         }
     }

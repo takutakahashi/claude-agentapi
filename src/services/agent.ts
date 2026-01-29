@@ -180,6 +180,44 @@ export class AgentService {
     }
   }
 
+  async sendAction(answers: Record<string, string>): Promise<void> {
+    if (!this.inputStreamManager) {
+      throw new Error('Agent not initialized');
+    }
+
+    if (this.status !== 'running') {
+      throw new Error('No active question to answer');
+    }
+
+    try {
+      logger.info('Sending action response to agent...', { answers });
+
+      // Add user message to history for tracking
+      const answerText = `Answers: ${JSON.stringify(answers, null, 2)}`;
+      const userMessage = this.addMessage('user', answerText);
+      sessionService.broadcastMessageUpdate(userMessage);
+
+      // Send answer through input stream
+      // The SDK expects answers to be passed via the AskUserQuestion tool's response mechanism
+      this.inputStreamManager.send({
+        type: 'user',
+        message: {
+          role: 'user',
+          content: answerText,
+        },
+        parent_tool_use_id: null,
+        session_id: 'default',
+      });
+
+      // Wait a bit for processing to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+    } catch (error) {
+      logger.error('Error processing action:', error);
+      throw error;
+    }
+  }
+
   private async processSDKMessage(msg: SDKMessage): Promise<void> {
     try {
       logger.debug('Processing SDK message:', JSON.stringify(msg, null, 2));

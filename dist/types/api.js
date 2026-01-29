@@ -43,4 +43,11 @@ export const ProblemJsonSchema = z.object({
     detail: z.string().optional(),
     instance: z.string().optional(),
 });
+// Action request schema for answering AskUserQuestion
+export const PostActionRequestSchema = z.object({
+    answers: z.record(z.string(), z.string()),
+});
+export const PostActionResponseSchema = z.object({
+    ok: z.boolean(),
+});
 //# sourceMappingURL=api.js.map
