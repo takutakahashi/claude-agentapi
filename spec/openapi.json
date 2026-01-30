@@ -158,6 +158,92 @@
           }
         }
       }
+    },
+    "/action": {
+      "post": {
+        "summary": "Send an action to the agent",
+        "description": "Sends an action to the Claude agent. Supports multiple action types: answer_question (for AskUserQuestion), approve_plan (for ExitPlanMode), and stop_agent.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/AnswerQuestionAction"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ApprovePlanAction"
+                  },
+                  {
+                    "$ref": "#/components/schemas/StopAgentAction"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "type"
+                }
+              },
+              "examples": {
+                "answer_question": {
+                  "summary": "Answer a question",
+                  "value": {
+                    "type": "answer_question",
+                    "answers": {
+                      "question1": "answer1",
+                      "question2": "answer2"
+                    }
+                  }
+                },
+                "approve_plan": {
+                  "summary": "Approve a plan",
+                  "value": {
+                    "type": "approve_plan",
+                    "approved": true
+                  }
+                },
+                "stop_agent": {
+                  "summary": "Stop the agent",
+                  "value": {
+                    "type": "stop_agent"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Action sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemJson"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No active question or plan to respond to",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemJson"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -305,6 +391,60 @@
           "instance": {
             "type": "string",
             "description": "A URI reference that identifies the specific occurrence"
+          }
+        }
+      },
+      "AnswerQuestionAction": {
+        "type": "object",
+        "required": ["type", "answers"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["answer_question"],
+            "description": "Action type to answer a question from AskUserQuestion"
+          },
+          "answers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Map of question IDs to answers"
+          }
+        }
+      },
+      "ApprovePlanAction": {
+        "type": "object",
+        "required": ["type", "approved"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["approve_plan"],
+            "description": "Action type to approve or reject a plan from ExitPlanMode"
+          },
+          "approved": {
+            "type": "boolean",
+            "description": "Whether the plan is approved (true) or rejected (false)"
+          }
+        }
+      },
+      "StopAgentAction": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["stop_agent"],
+            "description": "Action type to stop the running agent"
+          }
+        }
+      },
+      "PostActionResponse": {
+        "type": "object",
+        "required": ["ok"],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the action was processed successfully"
           }
         }
       }

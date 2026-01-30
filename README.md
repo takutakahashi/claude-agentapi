@@ -302,19 +302,39 @@ Get current agent status.
 ```
 
 ### GET /messages
-Get conversation message history.
+Get conversation message history (user and assistant messages only).
 
 **Response:**
 ```json
-[
-  {
-    "id": "msg_1_1234567890",
-    "role": "user" | "assistant",
-    "content": "Message content",
-    "time": "2024-01-01T00:00:00.000Z",
-    "type": "normal" | "question" | "plan"
-  }
-]
+{
+  "messages": [
+    {
+      "id": 1,
+      "role": "user" | "assistant",
+      "content": "Message content",
+      "time": "2024-01-01T00:00:00.000Z",
+      "type": "normal" | "question" | "plan"
+    }
+  ]
+}
+```
+
+### GET /tool_status
+Get currently active tool executions. When a tool starts executing, it appears in this list. When the tool completes (success or error), it is removed from the list.
+
+**Response:**
+```json
+{
+  "messages": [
+    {
+      "id": 2,
+      "role": "agent",
+      "content": "{\"type\":\"tool_use\",\"name\":\"Read\",\"id\":\"toolu_123\",\"input\":{\"file_path\":\"/path/to/file\"}}",
+      "time": "2024-01-01T00:00:00.000Z",
+      "toolUseId": "toolu_123"
+    }
+  ]
+}
 ```
 
 ### POST /message
@@ -344,6 +364,95 @@ Send a message to the agent.
   "detail": "The agent is currently processing another request."
 }
 ```
+
+### POST /action
+Send an action to the agent. Supports multiple action types for different agent interactions.
+
+#### Action Type: `answer_question`
+Answer questions from the AskUserQuestion tool.
+
+**Request:**
+```json
+{
+  "type": "answer_question",
+  "answers": {
+    "question1": "answer1",
+    "question2": "answer2"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "ok": true
+}
+```
+
+**Error (409 - No Active Question):**
+```json
+{
+  "type": "about:blank",
+  "title": "No active question",
+  "status": 409,
+  "detail": "There is no active question to answer. The agent must be running and waiting for user input."
+}
+```
+
+#### Action Type: `approve_plan`
+Approve or reject a plan presented by the ExitPlanMode tool.
+
+**Request (Approve):**
+```json
+{
+  "type": "approve_plan",
+  "approved": true
+}
+```
+
+**Request (Reject):**
+```json
+{
+  "type": "approve_plan",
+  "approved": false
+}
+```
+
+**Response:**
+```json
+{
+  "ok": true
+}
+```
+
+**Error (409 - No Active Plan):**
+```json
+{
+  "type": "about:blank",
+  "title": "No active plan",
+  "status": 409,
+  "detail": "There is no active plan to approve. The agent must be running and waiting for plan approval."
+}
+```
+
+#### Action Type: `stop_agent`
+Stop the currently running agent.
+
+**Request:**
+```json
+{
+  "type": "stop_agent"
+}
+```
+
+**Response:**
+```json
+{
+  "ok": true
+}
+```
+
+**Note:** This action can be called at any time, regardless of agent status.
 
 ### GET /events
 Server-Sent Events (SSE) stream for real-time updates.
@@ -385,16 +494,22 @@ src/
 │   ├── status.ts         # GET /status
 │   ├── messages.ts       # GET /messages
 │   ├── message.ts        # POST /message
+│   ├── action.ts         # POST /action
+│   ├── tool_status.ts    # GET /tool_status
 │   └── events.ts         # GET /events (SSE)
 ├── services/             # Business logic
 │   ├── agent.ts          # Claude Agent SDK integration
-│   └── session.ts        # SSE session management
+│   ├── session.ts        # SSE session management
+│   └── metrics.ts        # Prometheus metrics collection
 ├── types/                # TypeScript type definitions
 │   ├── api.ts            # API types
-│   └── agent.ts          # Agent types
+│   ├── agent.ts          # Agent types
+│   └── config.ts         # Configuration types
 └── utils/                # Utility functions
     ├── logger.ts         # Logging utility
-    └── sse.ts            # SSE helper
+    ├── sse.ts            # SSE helper
+    ├── config.ts         # Configuration loader
+    └── telemetry.ts      # OpenTelemetry setup
 ```
 
 ## MCP Servers and Plugins
@@ -583,13 +698,41 @@ sum by (type) (claude_code_lines_of_code_count)
 
 ## Special Features
 
-### AskUserQuestion Handling
+### Agent Actions (`POST /action`)
 
-When the agent uses the `AskUserQuestion` tool, the server automatically formats the question and broadcasts it as a message with `type: "question"`. The question appears with a ❓ emoji prefix.
+The `/action` endpoint provides a unified interface for interacting with the agent through different action types:
 
-### ExitPlanMode Handling
+#### 1. **Answer Questions** (`answer_question`)
+When the agent uses the `AskUserQuestion` tool:
+- The server automatically formats and broadcasts the question with `type: "question"` (❓ emoji prefix)
+- Client sends answers via `/action` with `type: "answer_question"`
+- Answers are sent back to the agent as a `tool_result`
 
-When the agent uses the `ExitPlanMode` tool, the server formats the plan and broadcasts it as a message with `type: "plan"`. The plan appears with a 📋 emoji prefix.
+**Example workflow:**
+1. Agent calls `AskUserQuestion` → Server broadcasts question message
+2. Client sends: `POST /action` with `{"type": "answer_question", "answers": {"q1": "a1"}}`
+3. Server forwards answer to agent as `tool_result`
+
+#### 2. **Approve/Reject Plans** (`approve_plan`)
+When the agent uses the `ExitPlanMode` tool:
+- The server formats and broadcasts the plan with `type: "plan"` (📋 emoji prefix)
+- Client approves or rejects via `/action` with `type: "approve_plan"`
+- Approval/rejection is sent back to the agent as a `tool_result`
+
+**Example workflow:**
+1. Agent calls `ExitPlanMode` → Server broadcasts plan message
+2. Client sends: `POST /action` with `{"type": "approve_plan", "approved": true}`
+3. Server forwards approval to agent as `tool_result`
+
+#### 3. **Stop Agent** (`stop_agent`)
+Allows interrupting the agent at any time:
+- Can be called regardless of agent status
+- Immediately interrupts the running query
+- Sets agent status to `stable`
+
+**Example:**
+- Client sends: `POST /action` with `{"type": "stop_agent"}`
+- Server interrupts agent and returns to stable state
 
 ## Error Handling
 
