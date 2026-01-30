@@ -82,10 +82,26 @@ export interface InitEvent {
   status: 'running' | 'stable';
 }
 
-// Action request schema for answering AskUserQuestion
-export const PostActionRequestSchema = z.object({
+// Action request schemas for various agent actions
+export const AnswerQuestionActionSchema = z.object({
+  type: z.literal('answer_question'),
   answers: z.record(z.string(), z.string()),
 });
+
+export const ApprovePlanActionSchema = z.object({
+  type: z.literal('approve_plan'),
+  approved: z.boolean(),
+});
+
+export const StopAgentActionSchema = z.object({
+  type: z.literal('stop_agent'),
+});
+
+export const PostActionRequestSchema = z.discriminatedUnion('type', [
+  AnswerQuestionActionSchema,
+  ApprovePlanActionSchema,
+  StopAgentActionSchema,
+]);
 
 export type PostActionRequest = z.infer<typeof PostActionRequestSchema>;
 

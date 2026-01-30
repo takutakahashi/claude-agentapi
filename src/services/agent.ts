@@ -44,6 +44,7 @@ export class AgentService {
   private activeToolExecutions: Message[] = [];
   private messageIdCounter = 0;
   private pendingQuestionToolUseId: string | null = null;
+  private pendingPlanToolUseId: string | null = null;
 
   async initialize(): Promise<void> {
     try {
@@ -232,6 +233,78 @@ export class AgentService {
     }
   }
 
+  async approvePlan(approved: boolean): Promise<void> {
+    if (!this.inputStreamManager) {
+      throw new Error('Agent not initialized');
+    }
+
+    if (this.status !== 'running') {
+      throw new Error('No active plan to approve');
+    }
+
+    if (!this.pendingPlanToolUseId) {
+      throw new Error('No pending plan to approve');
+    }
+
+    try {
+      const toolUseId = this.pendingPlanToolUseId;
+      logger.info('Sending plan approval response to agent...', { approved, tool_use_id: toolUseId });
+
+      // Add user message to history for tracking
+      const approvalText = approved ? '✅ Plan approved' : '❌ Plan rejected';
+      const userMessage = this.addMessage('user', approvalText);
+      sessionService.broadcastMessageUpdate(userMessage);
+
+      // Send approval/rejection as tool_result through input stream
+      this.inputStreamManager.send({
+        type: 'user',
+        message: {
+          role: 'user',
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: toolUseId,
+              content: approved ? 'approved' : 'rejected',
+            },
+          ],
+        },
+        parent_tool_use_id: null,
+        session_id: 'default',
+      });
+
+      // Clear the pending plan
+      this.pendingPlanToolUseId = null;
+
+      // Wait a bit for processing to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+    } catch (error) {
+      logger.error('Error processing plan approval:', error);
+      throw error;
+    }
+  }
+
+  async stopAgent(): Promise<void> {
+    if (!this.query) {
+      throw new Error('Agent not initialized');
+    }
+
+    try {
+      logger.info('Stopping agent...');
+
+      // Interrupt the query
+      await this.query.interrupt();
+
+      // Set status to stable
+      this.setStatus('stable');
+
+      logger.info('Agent stopped successfully');
+    } catch (error) {
+      logger.error('Error stopping agent:', error);
+      throw error;
+    }
+  }
+
   private async processSDKMessage(msg: SDKMessage): Promise<void> {
     try {
       logger.debug('Processing SDK message:', JSON.stringify(msg, null, 2));
@@ -383,11 +456,14 @@ export class AgentService {
       sessionService.broadcastMessageUpdate(questionMessage);
       logger.info('AskUserQuestion detected and broadcasted', { tool_use_id: id });
     } else if (name === 'ExitPlanMode') {
+      // Save the tool_use_id for later response
+      this.pendingPlanToolUseId = id || null;
+
       // Format as a plan message
       const planText = this.formatPlan(input);
       const planMessage = this.addMessage('assistant', planText, 'plan');
       sessionService.broadcastMessageUpdate(planMessage);
-      logger.info('ExitPlanMode detected and broadcasted');
+      logger.info('ExitPlanMode detected and broadcasted', { tool_use_id: id });
     }
   }
 

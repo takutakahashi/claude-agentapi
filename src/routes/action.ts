@@ -21,21 +21,61 @@ router.post('/action', async (req, res) => {
       return res.status(400).json(error);
     }
 
-    const { answers } = validation.data;
+    const action = validation.data;
 
-    // Check if agent is running (has an active question)
-    if (agentService.getStatus() !== 'running') {
-      const error: ProblemJson = {
-        type: 'about:blank',
-        title: 'No active question',
-        status: 409,
-        detail: 'There is no active question to answer. The agent must be running and waiting for user input.',
-      };
-      return res.status(409).json(error);
+    // Handle different action types
+    switch (action.type) {
+      case 'answer_question': {
+        // Check if agent is running (has an active question)
+        if (agentService.getStatus() !== 'running') {
+          const error: ProblemJson = {
+            type: 'about:blank',
+            title: 'No active question',
+            status: 409,
+            detail: 'There is no active question to answer. The agent must be running and waiting for user input.',
+          };
+          return res.status(409).json(error);
+        }
+
+        // Send action response to agent
+        await agentService.sendAction(action.answers);
+        break;
+      }
+
+      case 'approve_plan': {
+        // Check if agent is running (has an active plan)
+        if (agentService.getStatus() !== 'running') {
+          const error: ProblemJson = {
+            type: 'about:blank',
+            title: 'No active plan',
+            status: 409,
+            detail: 'There is no active plan to approve. The agent must be running and waiting for plan approval.',
+          };
+          return res.status(409).json(error);
+        }
+
+        // Send plan approval to agent
+        await agentService.approvePlan(action.approved);
+        break;
+      }
+
+      case 'stop_agent': {
+        // Stop the agent
+        await agentService.stopAgent();
+        break;
+      }
+
+      default: {
+        // TypeScript should ensure this is unreachable
+        const error: ProblemJson = {
+          type: 'about:blank',
+          title: 'Unknown action type',
+          status: 400,
+          detail: 'Unknown action type',
+        };
+        return res.status(400).json(error);
+      }
     }
-
-    // Send action response to agent
-    await agentService.sendAction(answers);
 
     const response: PostActionResponse = { ok: true };
     return res.json(response);
