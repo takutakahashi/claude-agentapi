@@ -369,6 +369,34 @@ Send a message to the agent.
 }
 ```
 
+### GET /action
+Get a list of pending actions that require user response.
+
+**Response:**
+```json
+{
+  "pending_actions": [
+    {
+      "type": "answer_question",
+      "tool_use_id": "toolu_123",
+      "content": {
+        "questions": [
+          {
+            "question": "Which library should we use?",
+            "header": "Library",
+            "multiSelect": false,
+            "options": [
+              { "label": "React", "description": "UI library" },
+              { "label": "Vue", "description": "Progressive framework" }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
 ### POST /action
 Send an action to the agent. Supports multiple action types for different agent interactions.
 

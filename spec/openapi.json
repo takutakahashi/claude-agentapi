@@ -160,6 +160,74 @@
       }
     },
     "/action": {
+      "get": {
+        "summary": "Get pending actions",
+        "description": "Returns a list of pending actions that require user response, including their content (questions, plans, etc.)",
+        "responses": {
+          "200": {
+            "description": "Pending actions retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetActionResponse"
+                },
+                "examples": {
+                  "no_actions": {
+                    "summary": "No pending actions",
+                    "value": {
+                      "pending_actions": []
+                    }
+                  },
+                  "with_question": {
+                    "summary": "Pending question",
+                    "value": {
+                      "pending_actions": [
+                        {
+                          "type": "answer_question",
+                          "tool_use_id": "toolu_123",
+                          "content": {
+                            "questions": [
+                              {
+                                "question": "Which library should we use?",
+                                "header": "Library",
+                                "multiSelect": false,
+                                "options": [
+                                  {
+                                    "label": "React",
+                                    "description": "UI library"
+                                  },
+                                  {
+                                    "label": "Vue",
+                                    "description": "Progressive framework"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "with_plan": {
+                    "summary": "Pending plan",
+                    "value": {
+                      "pending_actions": [
+                        {
+                          "type": "approve_plan",
+                          "tool_use_id": "toolu_456",
+                          "content": {
+                            "plan": "Implementation plan details..."
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "summary": "Send an action to the agent",
         "description": "Sends an action to the Claude agent. Supports multiple action types: answer_question (for AskUserQuestion), approve_plan (for ExitPlanMode), and stop_agent.",
@@ -445,6 +513,36 @@
           "ok": {
             "type": "boolean",
             "description": "Whether the action was processed successfully"
+          }
+        }
+      },
+      "PendingAction": {
+        "type": "object",
+        "required": ["type", "tool_use_id", "content"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Type of pending action (answer_question or approve_plan)"
+          },
+          "tool_use_id": {
+            "type": "string",
+            "description": "Tool use ID for this pending action"
+          },
+          "content": {
+            "description": "Content of the pending action (question details, plan details, etc.)"
+          }
+        }
+      },
+      "GetActionResponse": {
+        "type": "object",
+        "required": ["pending_actions"],
+        "properties": {
+          "pending_actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingAction"
+            },
+            "description": "Array of pending actions that require user response"
           }
         }
       }

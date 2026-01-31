@@ -10,6 +10,7 @@ vi.mock('../../services/agent.js', () => ({
     sendAction: vi.fn(),
     approvePlan: vi.fn(),
     stopAgent: vi.fn(),
+    getPendingActions: vi.fn(),
     sendMessage: vi.fn(),
     getMessages: vi.fn(),
     initialize: vi.fn(),
@@ -26,6 +27,101 @@ vi.mock('../../services/session.js', () => ({
     getSubscriberCount: vi.fn(),
   },
 }));
+
+describe('GET /action', () => {
+  const app = createServer();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should return empty array when no pending actions', async () => {
+    (agentService.getPendingActions as ReturnType<typeof vi.fn>).mockReturnValue([]);
+
+    const response = await request(app).get('/action');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ pending_actions: [] });
+  });
+
+  it('should return pending question', async () => {
+    (agentService.getPendingActions as ReturnType<typeof vi.fn>).mockReturnValue([
+      {
+        type: 'answer_question',
+        tool_use_id: 'toolu_123',
+        content: {
+          questions: [
+            {
+              question: 'Which library should we use?',
+              header: 'Library',
+              multiSelect: false,
+              options: [
+                { label: 'React', description: 'UI library' },
+                { label: 'Vue', description: 'Progressive framework' },
+              ],
+            },
+          ],
+        },
+      },
+    ]);
+
+    const response = await request(app).get('/action');
+
+    expect(response.status).toBe(200);
+    expect(response.body.pending_actions).toHaveLength(1);
+    expect(response.body.pending_actions[0].type).toBe('answer_question');
+    expect(response.body.pending_actions[0].tool_use_id).toBe('toolu_123');
+    expect(response.body.pending_actions[0].content.questions).toHaveLength(1);
+  });
+
+  it('should return pending plan', async () => {
+    (agentService.getPendingActions as ReturnType<typeof vi.fn>).mockReturnValue([
+      {
+        type: 'approve_plan',
+        tool_use_id: 'toolu_456',
+        content: { plan: 'Implementation plan details...' },
+      },
+    ]);
+
+    const response = await request(app).get('/action');
+
+    expect(response.status).toBe(200);
+    expect(response.body.pending_actions).toHaveLength(1);
+    expect(response.body.pending_actions[0].type).toBe('approve_plan');
+    expect(response.body.pending_actions[0].tool_use_id).toBe('toolu_456');
+  });
+
+  it('should return multiple pending actions', async () => {
+    (agentService.getPendingActions as ReturnType<typeof vi.fn>).mockReturnValue([
+      {
+        type: 'answer_question',
+        tool_use_id: 'toolu_123',
+        content: { questions: [] },
+      },
+      {
+        type: 'approve_plan',
+        tool_use_id: 'toolu_456',
+        content: { plan: 'Plan...' },
+      },
+    ]);
+
+    const response = await request(app).get('/action');
+
+    expect(response.status).toBe(200);
+    expect(response.body.pending_actions).toHaveLength(2);
+  });
+
+  it('should handle errors', async () => {
+    (agentService.getPendingActions as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      throw new Error('Test error');
+    });
+
+    const response = await request(app).get('/action');
+
+    expect(response.status).toBe(500);
+    expect(response.body).toHaveProperty('title', 'Internal server error');
+  });
+});
 
 describe('POST /action', () => {
   const app = createServer();

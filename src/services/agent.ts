@@ -44,7 +44,9 @@ export class AgentService {
   private activeToolExecutions: Message[] = [];
   private messageIdCounter = 0;
   private pendingQuestionToolUseId: string | null = null;
+  private pendingQuestionInput: unknown | null = null;
   private pendingPlanToolUseId: string | null = null;
+  private pendingPlanInput: unknown | null = null;
 
   async initialize(): Promise<void> {
     try {
@@ -223,6 +225,7 @@ export class AgentService {
 
       // Clear the pending question
       this.pendingQuestionToolUseId = null;
+      this.pendingQuestionInput = null;
 
       // Wait a bit for processing to complete
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -274,6 +277,7 @@ export class AgentService {
 
       // Clear the pending plan
       this.pendingPlanToolUseId = null;
+      this.pendingPlanInput = null;
 
       // Wait a bit for processing to complete
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -447,8 +451,9 @@ export class AgentService {
     const { name, input, id } = toolUse;
 
     if (name === 'AskUserQuestion') {
-      // Save the tool_use_id for later response
+      // Save the tool_use_id and input for later response
       this.pendingQuestionToolUseId = id || null;
+      this.pendingQuestionInput = input;
 
       // Format as a question message
       const questionText = this.formatQuestion(input);
@@ -456,8 +461,9 @@ export class AgentService {
       sessionService.broadcastMessageUpdate(questionMessage);
       logger.info('AskUserQuestion detected and broadcasted', { tool_use_id: id });
     } else if (name === 'ExitPlanMode') {
-      // Save the tool_use_id for later response
+      // Save the tool_use_id and input for later response
       this.pendingPlanToolUseId = id || null;
+      this.pendingPlanInput = input;
 
       // Format as a plan message
       const planText = this.formatPlan(input);
@@ -683,6 +689,28 @@ export class AgentService {
 
   getActiveToolExecutions(): Message[] {
     return [...this.activeToolExecutions];
+  }
+
+  getPendingActions(): Array<{ type: string; tool_use_id: string; content: unknown }> {
+    const pending: Array<{ type: string; tool_use_id: string; content: unknown }> = [];
+
+    if (this.pendingQuestionToolUseId && this.pendingQuestionInput) {
+      pending.push({
+        type: 'answer_question',
+        tool_use_id: this.pendingQuestionToolUseId,
+        content: this.pendingQuestionInput,
+      });
+    }
+
+    if (this.pendingPlanToolUseId && this.pendingPlanInput) {
+      pending.push({
+        type: 'approve_plan',
+        tool_use_id: this.pendingPlanToolUseId,
+        content: this.pendingPlanInput,
+      });
+    }
+
+    return pending;
   }
 
   async cleanup(): Promise<void> {

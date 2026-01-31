@@ -10,6 +10,80 @@
 
 ## エンドポイント仕様
 
+### GET /action - 保留中のアクション一覧を取得
+
+現在ユーザーの応答を待っているアクションの一覧を取得します。質問やプランの内容も含まれます。
+
+- **URL**: `GET /action`
+- **レスポンス**: `application/json`
+
+#### レスポンス形式
+
+```json
+{
+  "pending_actions": [
+    {
+      "type": "answer_question" | "approve_plan",
+      "tool_use_id": "toolu_xxx",
+      "content": { ... }  // 質問やプランの詳細
+    }
+  ]
+}
+```
+
+#### 使用例
+
+##### TypeScript/JavaScript
+
+```typescript
+async function getPendingActions() {
+  const response = await fetch('http://localhost:9000/action');
+  const data = await response.json();
+  return data.pending_actions;
+}
+
+// 使用例
+const pending = await getPendingActions();
+console.log(`保留中のアクション: ${pending.length}件`);
+
+for (const action of pending) {
+  if (action.type === 'answer_question') {
+    console.log('質問:', action.content.questions);
+  } else if (action.type === 'approve_plan') {
+    console.log('プラン:', action.content);
+  }
+}
+```
+
+##### Python
+
+```python
+import requests
+
+def get_pending_actions() -> list:
+    response = requests.get('http://localhost:9000/action')
+    response.raise_for_status()
+    return response.json()['pending_actions']
+
+# 使用例
+pending = get_pending_actions()
+print(f'保留中のアクション: {len(pending)}件')
+
+for action in pending:
+    if action['type'] == 'answer_question':
+        print('質問:', action['content']['questions'])
+    elif action['type'] == 'approve_plan':
+        print('プラン:', action['content'])
+```
+
+##### curl
+
+```bash
+curl http://localhost:9000/action | jq
+```
+
+### POST /action - アクションを送信
+
 - **URL**: `POST /action`
 - **Content-Type**: `application/json`
 - **レスポンス**: `application/json`
@@ -418,28 +492,37 @@ interface Message {
   type?: 'normal' | 'question' | 'plan';
 }
 
+interface PendingAction {
+  type: string;
+  tool_use_id: string;
+  content: unknown;
+}
+
 function AgentClient() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [pendingQuestion, setPendingQuestion] = useState<Message | null>(null);
-  const [pendingPlan, setPendingPlan] = useState<Message | null>(null);
+  const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
 
+  // 保留中のアクションを定期的にポーリング
   useEffect(() => {
-    // SSE 接続
+    const fetchPendingActions = async () => {
+      const response = await fetch('http://localhost:9000/action');
+      const data = await response.json();
+      setPendingActions(data.pending_actions);
+    };
+
+    fetchPendingActions();
+    const interval = setInterval(fetchPendingActions, 2000); // 2秒ごと
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // SSE 接続でメッセージを受信
+  useEffect(() => {
     const eventSource = new EventSource('http://localhost:9000/events');
 
     eventSource.addEventListener('message_update', (event) => {
       const message = JSON.parse(event.data);
       setMessages(prev => [...prev, message]);
-
-      // 質問を検出
-      if (message.type === 'question') {
-        setPendingQuestion(message);
-      }
-
-      // プランを検出
-      if (message.type === 'plan') {
-        setPendingPlan(message);
-      }
     });
 
     return () => eventSource.close();
@@ -466,7 +549,6 @@ function AgentClient() {
         approved,
       }),
     });
-    setPendingPlan(null);
   };
 
   const stopAgent = async () => {
@@ -478,6 +560,10 @@ function AgentClient() {
       }),
     });
   };
+
+  // 保留中のアクションを type で分類
+  const pendingQuestion = pendingActions.find(a => a.type === 'answer_question');
+  const pendingPlan = pendingActions.find(a => a.type === 'approve_plan');
 
   return (
     <div>
@@ -492,8 +578,8 @@ function AgentClient() {
       {pendingQuestion && (
         <div>
           <h3>質問が届いています</h3>
-          <p>{pendingQuestion.content}</p>
-          <button onClick={() => answerQuestion({ answer: 'yes' })}>
+          <pre>{JSON.stringify(pendingQuestion.content, null, 2)}</pre>
+          <button onClick={() => answerQuestion({ '0': 'answer' })}>
             回答する
           </button>
         </div>
@@ -503,7 +589,7 @@ function AgentClient() {
       {pendingPlan && (
         <div>
           <h3>プランの承認を求められています</h3>
-          <p>{pendingPlan.content}</p>
+          <pre>{JSON.stringify(pendingPlan.content, null, 2)}</pre>
           <button onClick={() => handlePlanApproval(true)}>承認</button>
           <button onClick={() => handlePlanApproval(false)}>却下</button>
         </div>
@@ -527,8 +613,12 @@ from sseclient import SSEClient  # pip install sseclient-py
 class AgentAPIClient:
     def __init__(self, base_url: str = "http://localhost:9000"):
         self.base_url = base_url
-        self.pending_question = None
-        self.pending_plan = None
+
+    def get_pending_actions(self) -> list:
+        """保留中のアクションを取得"""
+        response = requests.get(f"{self.base_url}/action")
+        response.raise_for_status()
+        return response.json()["pending_actions"]
 
     def send_message(self, content: str):
         """エージェントにメッセージを送信"""
@@ -675,9 +765,29 @@ if __name__ == "__main__":
 
 ## ベストプラクティス
 
-### 1. SSE イベントと連携する
+### 1. GET /action で保留中のアクションを確認する
 
-`/action` エンドポイントは SSE イベントと密接に連携して動作します。質問やプランは SSE の `message_update` イベントで通知されるため、必ず SSE 接続を確立してください。
+SSE イベントに頼るだけでなく、定期的に `GET /action` を呼び出して保留中のアクションを確認することを推奨します。これにより、ネットワークの問題などでSSEイベントを見逃した場合でも、確実にアクションを取得できます。
+
+```typescript
+// 定期的にポーリング
+const interval = setInterval(async () => {
+  const response = await fetch('http://localhost:9000/action');
+  const data = await response.json();
+
+  for (const action of data.pending_actions) {
+    if (action.type === 'answer_question') {
+      // 質問への回答UIを表示
+    } else if (action.type === 'approve_plan') {
+      // プラン承認UIを表示
+    }
+  }
+}, 2000); // 2秒ごと
+```
+
+### 2. SSE イベントと連携する
+
+`GET /action` と SSE イベントを組み合わせることで、リアルタイム性と確実性の両方を実現できます。
 
 ```typescript
 const eventSource = new EventSource('http://localhost:9000/events');
@@ -685,10 +795,9 @@ const eventSource = new EventSource('http://localhost:9000/events');
 eventSource.addEventListener('message_update', (event) => {
   const message = JSON.parse(event.data);
 
-  if (message.type === 'question') {
-    // 質問への回答UIを表示
-  } else if (message.type === 'plan') {
-    // プラン承認UIを表示
+  // メッセージを受信したら、保留中のアクションを確認
+  if (message.type === 'question' || message.type === 'plan') {
+    fetchPendingActions();
   }
 });
 ```

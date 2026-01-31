@@ -1,10 +1,33 @@
 import { Router } from 'express';
 import { agentService } from '../services/agent.js';
 import { PostActionRequestSchema } from '../types/api.js';
-import type { PostActionResponse, ProblemJson } from '../types/api.js';
+import type { PostActionResponse, GetActionResponse, ProblemJson } from '../types/api.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
+
+router.get('/action', async (_req, res) => {
+  try {
+    const pendingActions = agentService.getPendingActions();
+
+    const response: GetActionResponse = {
+      pending_actions: pendingActions,
+    };
+
+    return res.json(response);
+  } catch (error) {
+    logger.error('Error getting pending actions:', error);
+
+    const problemJson: ProblemJson = {
+      type: 'about:blank',
+      title: 'Internal server error',
+      status: 500,
+      detail: error instanceof Error ? error.message : 'Unknown error occurred',
+    };
+
+    return res.status(500).json(problemJson);
+  }
+});
 
 router.post('/action', async (req, res) => {
   try {

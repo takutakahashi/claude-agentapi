@@ -110,3 +110,17 @@ export const PostActionResponseSchema = z.object({
 });
 
 export type PostActionResponse = z.infer<typeof PostActionResponseSchema>;
+
+export const PendingActionSchema = z.object({
+  type: z.string(),
+  tool_use_id: z.string(),
+  content: z.unknown(),
+});
+
+export type PendingAction = z.infer<typeof PendingActionSchema>;
+
+export const GetActionResponseSchema = z.object({
+  pending_actions: z.array(PendingActionSchema),
+});
+
+export type GetActionResponse = z.infer<typeof GetActionResponseSchema>;
