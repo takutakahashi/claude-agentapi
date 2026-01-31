@@ -119,6 +119,19 @@ export class AgentService {
         }
         catch (error) {
             logger.error('Error in query processor:', error);
+            // クエリプロセッサーでエラーが発生した場合、pending 状態をクリア
+            if (this.pendingQuestionToolUseId || this.pendingPlanToolUseId || this.activeToolExecutions.length > 0) {
+                logger.warn('Clearing pending states and active tool executions due to query processor error', {
+                    pending_question: !!this.pendingQuestionToolUseId,
+                    pending_plan: !!this.pendingPlanToolUseId,
+                    active_tools: this.activeToolExecutions.length,
+                });
+                this.pendingQuestionToolUseId = null;
+                this.pendingQuestionInput = null;
+                this.pendingPlanToolUseId = null;
+                this.pendingPlanInput = null;
+                this.activeToolExecutions = [];
+            }
             this.setStatus('stable');
         }
     }
@@ -335,6 +348,19 @@ export class AgentService {
             logger.info('Stopping agent...');
             // Interrupt the query
             await this.query.interrupt();
+            // Clear pending states and active tool executions
+            if (this.pendingQuestionToolUseId || this.pendingPlanToolUseId || this.activeToolExecutions.length > 0) {
+                logger.info('Clearing pending states and active tool executions due to agent stop', {
+                    pending_question: !!this.pendingQuestionToolUseId,
+                    pending_plan: !!this.pendingPlanToolUseId,
+                    active_tools: this.activeToolExecutions.length,
+                });
+                this.pendingQuestionToolUseId = null;
+                this.pendingQuestionInput = null;
+                this.pendingPlanToolUseId = null;
+                this.pendingPlanInput = null;
+                this.activeToolExecutions = [];
+            }
             // Set status to stable
             this.setStatus('stable');
             logger.info('Agent stopped successfully');
@@ -483,19 +509,34 @@ export class AgentService {
                 // Query completed
                 if (msg.subtype === 'success') {
                     logger.info('Query completed successfully');
+                    // AskUserQuestion, ExitPlanMode が pending の場合、またはツールが実行中の場合は stable にしない
+                    if (!this.pendingQuestionToolUseId && !this.pendingPlanToolUseId && this.activeToolExecutions.length === 0) {
+                        this.setStatus('stable');
+                    }
+                    else {
+                        logger.info('Keeping status as running due to pending user interaction or active tool executions', {
+                            has_pending_question: !!this.pendingQuestionToolUseId,
+                            has_pending_plan: !!this.pendingPlanToolUseId,
+                            active_tool_executions: this.activeToolExecutions.length,
+                        });
+                    }
                 }
                 else {
+                    // エラー時は pending 状態とツール実行をクリアして stable に戻す
                     logger.warn('Query completed with errors:', msg.errors);
-                }
-                // AskUserQuestion や ExitPlanMode が pending の場合は stable にしない
-                if (!this.pendingQuestionToolUseId && !this.pendingPlanToolUseId) {
+                    if (this.pendingQuestionToolUseId || this.pendingPlanToolUseId || this.activeToolExecutions.length > 0) {
+                        logger.warn('Clearing pending states and active tool executions due to error', {
+                            pending_question: !!this.pendingQuestionToolUseId,
+                            pending_plan: !!this.pendingPlanToolUseId,
+                            active_tools: this.activeToolExecutions.length,
+                        });
+                        this.pendingQuestionToolUseId = null;
+                        this.pendingQuestionInput = null;
+                        this.pendingPlanToolUseId = null;
+                        this.pendingPlanInput = null;
+                        this.activeToolExecutions = [];
+                    }
                     this.setStatus('stable');
-                }
-                else {
-                    logger.info('Keeping status as running due to pending user interaction', {
-                        has_pending_question: !!this.pendingQuestionToolUseId,
-                        has_pending_plan: !!this.pendingPlanToolUseId,
-                    });
                 }
             }
         }
@@ -808,6 +849,19 @@ export class AgentService {
             catch (error) {
                 logger.error('Error waiting for query processor:', error);
             }
+        }
+        // Clear all pending states and active tool executions
+        if (this.pendingQuestionToolUseId || this.pendingPlanToolUseId || this.activeToolExecutions.length > 0) {
+            logger.info('Clearing pending states and active tool executions during cleanup', {
+                pending_question: !!this.pendingQuestionToolUseId,
+                pending_plan: !!this.pendingPlanToolUseId,
+                active_tools: this.activeToolExecutions.length,
+            });
+            this.pendingQuestionToolUseId = null;
+            this.pendingQuestionInput = null;
+            this.pendingPlanToolUseId = null;
+            this.pendingPlanInput = null;
+            this.activeToolExecutions = [];
         }
         // Record session end metrics
         const metricsService = getMetricsService();
