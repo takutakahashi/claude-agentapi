@@ -487,14 +487,15 @@ export class AgentService {
                 else {
                     logger.warn('Query completed with errors:', msg.errors);
                 }
-                // AskUserQuestion や ExitPlanMode が pending の場合は stable にしない
-                if (!this.pendingQuestionToolUseId && !this.pendingPlanToolUseId) {
+                // AskUserQuestion, ExitPlanMode が pending の場合、またはツールが実行中の場合は stable にしない
+                if (!this.pendingQuestionToolUseId && !this.pendingPlanToolUseId && this.activeToolExecutions.length === 0) {
                     this.setStatus('stable');
                 }
                 else {
-                    logger.info('Keeping status as running due to pending user interaction', {
+                    logger.info('Keeping status as running due to pending user interaction or active tool executions', {
                         has_pending_question: !!this.pendingQuestionToolUseId,
                         has_pending_plan: !!this.pendingPlanToolUseId,
+                        active_tool_executions: this.activeToolExecutions.length,
                     });
                 }
             }
