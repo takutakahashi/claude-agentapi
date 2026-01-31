@@ -8,9 +8,11 @@ export declare class AgentService {
     private messages;
     private activeToolExecutions;
     private messageIdCounter;
+    private pendingQuestionToolUseId;
     initialize(): Promise<void>;
     private processQuery;
     sendMessage(content: string): Promise<void>;
+    sendAction(answers: Record<string, string>): Promise<void>;
     private processSDKMessage;
     private handleSystemMessage;
     private handleToolUse;
