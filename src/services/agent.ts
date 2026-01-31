@@ -570,7 +570,16 @@ export class AgentService {
         } else {
           logger.warn('Query completed with errors:', msg.errors);
         }
-        this.setStatus('stable');
+
+        // AskUserQuestion や ExitPlanMode が pending の場合は stable にしない
+        if (!this.pendingQuestionToolUseId && !this.pendingPlanToolUseId) {
+          this.setStatus('stable');
+        } else {
+          logger.info('Keeping status as running due to pending user interaction', {
+            has_pending_question: !!this.pendingQuestionToolUseId,
+            has_pending_plan: !!this.pendingPlanToolUseId,
+          });
+        }
       }
     } catch (error) {
       logger.error('Error processing SDK message', {

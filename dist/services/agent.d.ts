@@ -9,10 +9,15 @@ export declare class AgentService {
     private activeToolExecutions;
     private messageIdCounter;
     private pendingQuestionToolUseId;
+    private pendingQuestionInput;
+    private pendingPlanToolUseId;
+    private pendingPlanInput;
     initialize(): Promise<void>;
     private processQuery;
     sendMessage(content: string): Promise<void>;
     sendAction(answers: Record<string, string>): Promise<void>;
+    approvePlan(approved: boolean): Promise<void>;
+    stopAgent(): Promise<void>;
     private processSDKMessage;
     private handleSystemMessage;
     private handleToolUse;
@@ -27,6 +32,11 @@ export declare class AgentService {
     getStatus(): AgentStatus;
     getMessages(): Message[];
     getActiveToolExecutions(): Message[];
+    getPendingActions(): Array<{
+        type: string;
+        tool_use_id: string;
+        content: unknown;
+    }>;
     cleanup(): Promise<void>;
 }
 export declare const agentService: AgentService;
