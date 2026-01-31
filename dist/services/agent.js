@@ -39,6 +39,9 @@ export class AgentService {
     activeToolExecutions = [];
     messageIdCounter = 0;
     pendingQuestionToolUseId = null;
+    pendingQuestionInput = null;
+    pendingPlanToolUseId = null;
+    pendingPlanInput = null;
     async initialize() {
         try {
             logger.info('Initializing Claude Agent SDK with v1 API...');
@@ -154,24 +157,48 @@ export class AgentService {
         }
     }
     async sendAction(answers) {
+        logger.debug('sendAction called', {
+            answers_keys: Object.keys(answers),
+            current_status: this.status,
+            has_pending_question: !!this.pendingQuestionToolUseId,
+            has_input_stream: !!this.inputStreamManager,
+        });
         if (!this.inputStreamManager) {
-            throw new Error('Agent not initialized');
+            const error = new Error('Agent not initialized');
+            logger.error('sendAction failed: Agent not initialized', {
+                stack: error.stack,
+            });
+            throw error;
         }
         if (this.status !== 'running') {
-            throw new Error('No active question to answer');
+            const error = new Error('No active question to answer');
+            logger.error('sendAction failed: Agent not running', {
+                current_status: this.status,
+                stack: error.stack,
+            });
+            throw error;
         }
         if (!this.pendingQuestionToolUseId) {
-            throw new Error('No pending question to answer');
+            const error = new Error('No pending question to answer');
+            logger.error('sendAction failed: No pending question', {
+                has_pending_plan: !!this.pendingPlanToolUseId,
+                stack: error.stack,
+            });
+            throw error;
         }
         try {
             const toolUseId = this.pendingQuestionToolUseId;
-            logger.info('Sending action response to agent...', { answers, tool_use_id: toolUseId });
+            logger.info('Sending action response to agent', {
+                answers_count: Object.keys(answers).length,
+                tool_use_id: toolUseId,
+            });
             // Add user message to history for tracking
             const answerText = `Answers: ${JSON.stringify(answers, null, 2)}`;
             const userMessage = this.addMessage('user', answerText);
             sessionService.broadcastMessageUpdate(userMessage);
-            // Send answer as tool_result through input stream
-            this.inputStreamManager.send({
+            logger.debug('User answer message created and broadcasted', { message_id: userMessage.id });
+            // Prepare tool_result message
+            const toolResultMessage = {
                 type: 'user',
                 message: {
                     role: 'user',
@@ -185,14 +212,135 @@ export class AgentService {
                 },
                 parent_tool_use_id: null,
                 session_id: 'default',
+            };
+            logger.debug('Sending tool_result to SDK', {
+                tool_use_id: toolUseId,
+                content_preview: JSON.stringify({ answers }).substring(0, 200),
+            });
+            // Send answer as tool_result through input stream
+            this.inputStreamManager.send(toolResultMessage);
+            logger.info('tool_result sent successfully', {
+                tool_use_id: toolUseId,
             });
             // Clear the pending question
             this.pendingQuestionToolUseId = null;
+            this.pendingQuestionInput = null;
+            logger.debug('Pending question cleared', {
+                has_pending_question: !!this.pendingQuestionToolUseId,
+            });
             // Wait a bit for processing to complete
             await new Promise(resolve => setTimeout(resolve, 100));
         }
         catch (error) {
-            logger.error('Error processing action:', error);
+            logger.error('Error processing action', {
+                error: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+                tool_use_id: this.pendingQuestionToolUseId,
+                answers: JSON.stringify(answers),
+            });
+            throw error;
+        }
+    }
+    async approvePlan(approved) {
+        logger.debug('approvePlan called', {
+            approved,
+            current_status: this.status,
+            has_pending_plan: !!this.pendingPlanToolUseId,
+            has_input_stream: !!this.inputStreamManager,
+        });
+        if (!this.inputStreamManager) {
+            const error = new Error('Agent not initialized');
+            logger.error('approvePlan failed: Agent not initialized', {
+                stack: error.stack,
+            });
+            throw error;
+        }
+        if (this.status !== 'running') {
+            const error = new Error('No active plan to approve');
+            logger.error('approvePlan failed: Agent not running', {
+                current_status: this.status,
+                stack: error.stack,
+            });
+            throw error;
+        }
+        if (!this.pendingPlanToolUseId) {
+            const error = new Error('No pending plan to approve');
+            logger.error('approvePlan failed: No pending plan', {
+                has_pending_question: !!this.pendingQuestionToolUseId,
+                stack: error.stack,
+            });
+            throw error;
+        }
+        try {
+            const toolUseId = this.pendingPlanToolUseId;
+            logger.info('Sending plan approval response to agent', {
+                approved,
+                tool_use_id: toolUseId,
+            });
+            // Add user message to history for tracking
+            const approvalText = approved ? '✅ Plan approved' : '❌ Plan rejected';
+            const userMessage = this.addMessage('user', approvalText);
+            sessionService.broadcastMessageUpdate(userMessage);
+            logger.debug('User approval message created and broadcasted', { message_id: userMessage.id });
+            // Prepare tool_result message
+            const toolResultMessage = {
+                type: 'user',
+                message: {
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'tool_result',
+                            tool_use_id: toolUseId,
+                            content: approved ? 'approved' : 'rejected',
+                        },
+                    ],
+                },
+                parent_tool_use_id: null,
+                session_id: 'default',
+            };
+            logger.debug('Sending tool_result to SDK', {
+                tool_use_id: toolUseId,
+                content: approved ? 'approved' : 'rejected',
+            });
+            // Send approval/rejection as tool_result through input stream
+            this.inputStreamManager.send(toolResultMessage);
+            logger.info('tool_result sent successfully', {
+                tool_use_id: toolUseId,
+                approved,
+            });
+            // Clear the pending plan
+            this.pendingPlanToolUseId = null;
+            this.pendingPlanInput = null;
+            logger.debug('Pending plan cleared', {
+                has_pending_plan: !!this.pendingPlanToolUseId,
+            });
+            // Wait a bit for processing to complete
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        catch (error) {
+            logger.error('Error processing plan approval', {
+                error: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+                tool_use_id: this.pendingPlanToolUseId,
+                approved,
+            });
+            throw error;
+        }
+    }
+    async stopAgent() {
+        if (!this.query) {
+            throw new Error('Agent not initialized');
+        }
+        try {
+            logger.info('Stopping agent...');
+            // Interrupt the query
+            await this.query.interrupt();
+            // Set status to stable
+            this.setStatus('stable');
+            logger.info('Agent stopped successfully');
+        }
+        catch (error) {
+            logger.error('Error stopping agent:', error);
             throw error;
         }
     }
@@ -210,65 +358,125 @@ export class AgentService {
             }
             // Handle different message types
             if (msg.type === 'assistant') {
-                // Extract text content
-                const content = msg.message?.content || [];
-                const textBlocks = content.filter((block) => typeof block === 'object' && block !== null && 'type' in block && block.type === 'text');
-                if (textBlocks.length > 0) {
-                    const text = textBlocks.map((block) => block.text).join('\n');
-                    if (text.trim()) {
-                        const assistantMessage = this.addMessage('assistant', text);
-                        sessionService.broadcastMessageUpdate(assistantMessage);
+                try {
+                    logger.debug('Processing assistant message', {
+                        has_content: !!msg.message?.content,
+                        content_length: Array.isArray(msg.message?.content) ? msg.message.content.length : 0,
+                    });
+                    // Extract text content
+                    const content = msg.message?.content || [];
+                    const textBlocks = content.filter((block) => typeof block === 'object' && block !== null && 'type' in block && block.type === 'text');
+                    if (textBlocks.length > 0) {
+                        const text = textBlocks.map((block) => block.text).join('\n');
+                        if (text.trim()) {
+                            const assistantMessage = this.addMessage('assistant', text);
+                            sessionService.broadcastMessageUpdate(assistantMessage);
+                            logger.debug('Assistant text message broadcasted', { message_id: assistantMessage.id });
+                        }
+                    }
+                    // Check for tool uses
+                    const toolUses = content.filter((block) => typeof block === 'object' && block !== null && 'type' in block && block.type === 'tool_use');
+                    logger.debug('Found tool uses in assistant message', { count: toolUses.length });
+                    for (const toolUse of toolUses) {
+                        try {
+                            logger.debug('Processing tool use', {
+                                name: toolUse.name,
+                                id: toolUse.id,
+                                has_input: !!toolUse.input,
+                            });
+                            // Record tool use as agent message
+                            const toolUseMessage = this.formatToolUse(toolUse);
+                            const agentMessage = this.addMessage('agent', toolUseMessage, undefined, {
+                                toolUseId: toolUse.id,
+                            });
+                            sessionService.broadcastMessageUpdate(agentMessage);
+                            // Add to active tool executions
+                            this.activeToolExecutions.push(agentMessage);
+                            // Record tool metrics
+                            this.recordToolMetrics(toolUse.name, toolUse.input);
+                            // Handle special tool uses
+                            await this.handleToolUse(toolUse);
+                        }
+                        catch (toolError) {
+                            logger.error('Error processing individual tool use', {
+                                tool_name: toolUse.name,
+                                tool_id: toolUse.id,
+                                error: toolError instanceof Error ? toolError.message : String(toolError),
+                                stack: toolError instanceof Error ? toolError.stack : undefined,
+                            });
+                            throw toolError;
+                        }
                     }
                 }
-                // Check for tool uses
-                const toolUses = content.filter((block) => typeof block === 'object' && block !== null && 'type' in block && block.type === 'tool_use');
-                for (const toolUse of toolUses) {
-                    // Record tool use as agent message
-                    const toolUseMessage = this.formatToolUse(toolUse);
-                    const agentMessage = this.addMessage('agent', toolUseMessage, undefined, {
-                        toolUseId: toolUse.id,
+                catch (assistantError) {
+                    logger.error('Error processing assistant message', {
+                        error: assistantError instanceof Error ? assistantError.message : String(assistantError),
+                        stack: assistantError instanceof Error ? assistantError.stack : undefined,
+                        message_preview: JSON.stringify(msg).substring(0, 500),
                     });
-                    sessionService.broadcastMessageUpdate(agentMessage);
-                    // Add to active tool executions
-                    this.activeToolExecutions.push(agentMessage);
-                    // Record tool metrics
-                    this.recordToolMetrics(toolUse.name, toolUse.input);
-                    // Handle special tool uses
-                    await this.handleToolUse(toolUse);
+                    throw assistantError;
                 }
             }
             else if (msg.type === 'user') {
-                // Process tool results from SDK
-                const content = msg.message?.content || [];
-                const toolResults = content.filter((block) => typeof block === 'object' && block !== null && 'type' in block && block.type === 'tool_result');
-                for (const toolResult of toolResults) {
-                    // Format tool result content
-                    let resultContent = '';
-                    if (typeof toolResult.content === 'string') {
-                        resultContent = toolResult.content;
-                    }
-                    else if (Array.isArray(toolResult.content)) {
-                        // Extract text from content blocks
-                        const textBlocks = toolResult.content.filter((block) => typeof block === 'object' && block !== null && 'type' in block && block.type === 'text');
-                        resultContent = textBlocks.map((block) => block.text).join('\n');
-                    }
-                    else if (toolResult.content && typeof toolResult.content === 'object') {
-                        resultContent = JSON.stringify(toolResult.content, null, 2);
-                    }
-                    // Record tool result as tool_result message
-                    const toolResultMessage = this.addMessage('tool_result', resultContent, undefined, {
-                        parentToolUseId: toolResult.tool_use_id,
-                        status: toolResult.is_error ? 'error' : 'success',
-                        error: toolResult.is_error ? resultContent : undefined,
+                try {
+                    logger.debug('Processing user message', {
+                        has_content: !!msg.message?.content,
                     });
-                    sessionService.broadcastMessageUpdate(toolResultMessage);
-                    logger.debug('Tool result recorded:', { tool_use_id: toolResult.tool_use_id, status: toolResultMessage.status });
-                    // Remove corresponding agent message from active tool executions
-                    this.activeToolExecutions = this.activeToolExecutions.filter(msg => msg.toolUseId !== toolResult.tool_use_id);
+                    // Process tool results from SDK
+                    const content = msg.message?.content || [];
+                    const toolResults = content.filter((block) => typeof block === 'object' && block !== null && 'type' in block && block.type === 'tool_result');
+                    logger.debug('Found tool results in user message', { count: toolResults.length });
+                    for (const toolResult of toolResults) {
+                        try {
+                            logger.debug('Processing tool result', {
+                                tool_use_id: toolResult.tool_use_id,
+                                is_error: !!toolResult.is_error,
+                                content_type: typeof toolResult.content,
+                            });
+                            // Format tool result content
+                            let resultContent = '';
+                            if (typeof toolResult.content === 'string') {
+                                resultContent = toolResult.content;
+                            }
+                            else if (Array.isArray(toolResult.content)) {
+                                // Extract text from content blocks
+                                const textBlocks = toolResult.content.filter((block) => typeof block === 'object' && block !== null && 'type' in block && block.type === 'text');
+                                resultContent = textBlocks.map((block) => block.text).join('\n');
+                            }
+                            else if (toolResult.content && typeof toolResult.content === 'object') {
+                                resultContent = JSON.stringify(toolResult.content, null, 2);
+                            }
+                            // Record tool result as tool_result message
+                            const toolResultMessage = this.addMessage('tool_result', resultContent, undefined, {
+                                parentToolUseId: toolResult.tool_use_id,
+                                status: toolResult.is_error ? 'error' : 'success',
+                                error: toolResult.is_error ? resultContent : undefined,
+                            });
+                            sessionService.broadcastMessageUpdate(toolResultMessage);
+                            logger.debug('Tool result recorded:', { tool_use_id: toolResult.tool_use_id, status: toolResultMessage.status });
+                            // Remove corresponding agent message from active tool executions
+                            this.activeToolExecutions = this.activeToolExecutions.filter(msg => msg.toolUseId !== toolResult.tool_use_id);
+                        }
+                        catch (toolResultError) {
+                            logger.error('Error processing individual tool result', {
+                                tool_use_id: toolResult.tool_use_id,
+                                error: toolResultError instanceof Error ? toolResultError.message : String(toolResultError),
+                                stack: toolResultError instanceof Error ? toolResultError.stack : undefined,
+                            });
+                            throw toolResultError;
+                        }
+                    }
+                    // Log other user messages
+                    if (toolResults.length === 0) {
+                        logger.debug('User message from SDK (non-tool-result):', msg);
+                    }
                 }
-                // Log other user messages
-                if (toolResults.length === 0) {
-                    logger.debug('User message from SDK (non-tool-result):', msg);
+                catch (userError) {
+                    logger.error('Error processing user message', {
+                        error: userError instanceof Error ? userError.message : String(userError),
+                        stack: userError instanceof Error ? userError.stack : undefined,
+                    });
+                    throw userError;
                 }
             }
             else if (msg.type === 'result') {
@@ -279,11 +487,25 @@ export class AgentService {
                 else {
                     logger.warn('Query completed with errors:', msg.errors);
                 }
-                this.setStatus('stable');
+                // AskUserQuestion や ExitPlanMode が pending の場合は stable にしない
+                if (!this.pendingQuestionToolUseId && !this.pendingPlanToolUseId) {
+                    this.setStatus('stable');
+                }
+                else {
+                    logger.info('Keeping status as running due to pending user interaction', {
+                        has_pending_question: !!this.pendingQuestionToolUseId,
+                        has_pending_plan: !!this.pendingPlanToolUseId,
+                    });
+                }
             }
         }
         catch (error) {
-            logger.error('Error processing SDK message:', error);
+            logger.error('Error processing SDK message', {
+                message_type: msg.type,
+                error: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+            });
+            throw error;
         }
     }
     async handleSystemMessage(msg) {
@@ -309,20 +531,65 @@ export class AgentService {
     async handleToolUse(toolUse) {
         const { name, input, id } = toolUse;
         if (name === 'AskUserQuestion') {
-            // Save the tool_use_id for later response
-            this.pendingQuestionToolUseId = id || null;
-            // Format as a question message
-            const questionText = this.formatQuestion(input);
-            const questionMessage = this.addMessage('assistant', questionText, 'question');
-            sessionService.broadcastMessageUpdate(questionMessage);
-            logger.info('AskUserQuestion detected and broadcasted', { tool_use_id: id });
+            try {
+                logger.info('AskUserQuestion tool use detected', {
+                    tool_use_id: id,
+                    input_type: typeof input,
+                    input_preview: JSON.stringify(input).substring(0, 200),
+                });
+                // Save the tool_use_id and input for later response
+                this.pendingQuestionToolUseId = id || null;
+                this.pendingQuestionInput = input;
+                logger.info('Saved pending question', {
+                    tool_use_id: this.pendingQuestionToolUseId,
+                    has_input: !!this.pendingQuestionInput,
+                });
+                // Format as a question message
+                const questionText = this.formatQuestion(input);
+                const questionMessage = this.addMessage('assistant', questionText, 'question');
+                sessionService.broadcastMessageUpdate(questionMessage);
+                logger.info('AskUserQuestion detected and broadcasted successfully', {
+                    tool_use_id: id,
+                    message_id: questionMessage.id,
+                    current_status: this.status,
+                });
+            }
+            catch (error) {
+                logger.error('Error handling AskUserQuestion', {
+                    tool_use_id: id,
+                    error: error instanceof Error ? error.message : String(error),
+                    stack: error instanceof Error ? error.stack : undefined,
+                    input: JSON.stringify(input),
+                });
+                throw error;
+            }
         }
         else if (name === 'ExitPlanMode') {
-            // Format as a plan message
-            const planText = this.formatPlan(input);
-            const planMessage = this.addMessage('assistant', planText, 'plan');
-            sessionService.broadcastMessageUpdate(planMessage);
-            logger.info('ExitPlanMode detected and broadcasted');
+            try {
+                logger.info('ExitPlanMode tool use detected', {
+                    tool_use_id: id,
+                    input_type: typeof input,
+                });
+                // Save the tool_use_id and input for later response
+                this.pendingPlanToolUseId = id || null;
+                this.pendingPlanInput = input;
+                // Format as a plan message
+                const planText = this.formatPlan(input);
+                const planMessage = this.addMessage('assistant', planText, 'plan');
+                sessionService.broadcastMessageUpdate(planMessage);
+                logger.info('ExitPlanMode detected and broadcasted successfully', {
+                    tool_use_id: id,
+                    message_id: planMessage.id,
+                });
+            }
+            catch (error) {
+                logger.error('Error handling ExitPlanMode', {
+                    tool_use_id: id,
+                    error: error instanceof Error ? error.message : String(error),
+                    stack: error instanceof Error ? error.stack : undefined,
+                });
+                throw error;
+            }
         }
     }
     formatToolUse(toolUse) {
@@ -334,34 +601,50 @@ export class AgentService {
         }, null, 2);
     }
     formatQuestion(input) {
-        // Format AskUserQuestion input as readable text
-        if (typeof input === 'string') {
-            return `❓ Question: ${input}`;
-        }
-        if (typeof input === 'object' && input !== null && 'questions' in input) {
-            const { questions } = input;
-            if (Array.isArray(questions)) {
-                const formatted = questions.map((q, idx) => {
-                    if (typeof q === 'object' && q !== null && 'question' in q) {
-                        const question = q;
-                        let text = `\n**Question ${idx + 1}**: ${question.question}\n`;
-                        if (question.options && Array.isArray(question.options)) {
-                            text += question.options.map((opt, optIdx) => {
-                                if (typeof opt === 'object' && opt !== null && 'label' in opt) {
-                                    const option = opt;
-                                    return `  ${optIdx + 1}. ${option.label}${option.description ? ` - ${option.description}` : ''}`;
-                                }
-                                return '';
-                            }).join('\n');
-                        }
-                        return text;
-                    }
-                    return '';
-                }).join('\n');
-                return `❓ Questions:\n${formatted}`;
+        try {
+            logger.debug('Formatting question', { input_type: typeof input });
+            // Format AskUserQuestion input as readable text
+            if (typeof input === 'string') {
+                return `❓ Question: ${input}`;
             }
+            if (typeof input === 'object' && input !== null && 'questions' in input) {
+                const { questions } = input;
+                logger.debug('Questions field found', {
+                    is_array: Array.isArray(questions),
+                    length: Array.isArray(questions) ? questions.length : 'N/A',
+                });
+                if (Array.isArray(questions)) {
+                    const formatted = questions.map((q, idx) => {
+                        if (typeof q === 'object' && q !== null && 'question' in q) {
+                            const question = q;
+                            let text = `\n**Question ${idx + 1}**: ${question.question}\n`;
+                            if (question.options && Array.isArray(question.options)) {
+                                text += question.options.map((opt, optIdx) => {
+                                    if (typeof opt === 'object' && opt !== null && 'label' in opt) {
+                                        const option = opt;
+                                        return `  ${optIdx + 1}. ${option.label}${option.description ? ` - ${option.description}` : ''}`;
+                                    }
+                                    return '';
+                                }).join('\n');
+                            }
+                            return text;
+                        }
+                        return '';
+                    }).join('\n');
+                    return `❓ Questions:\n${formatted}`;
+                }
+            }
+            logger.debug('Using fallback JSON formatting for question');
+            return `❓ Question: ${JSON.stringify(input, null, 2)}`;
         }
-        return `❓ Question: ${JSON.stringify(input, null, 2)}`;
+        catch (error) {
+            logger.error('Error formatting question', {
+                error: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+                input: String(input),
+            });
+            return `❓ Question: [Error formatting question: ${error instanceof Error ? error.message : String(error)}]`;
+        }
     }
     formatPlan(input) {
         // Format ExitPlanMode input as readable text
@@ -487,6 +770,24 @@ export class AgentService {
     }
     getActiveToolExecutions() {
         return [...this.activeToolExecutions];
+    }
+    getPendingActions() {
+        const pending = [];
+        if (this.pendingQuestionToolUseId && this.pendingQuestionInput) {
+            pending.push({
+                type: 'answer_question',
+                tool_use_id: this.pendingQuestionToolUseId,
+                content: this.pendingQuestionInput,
+            });
+        }
+        if (this.pendingPlanToolUseId && this.pendingPlanInput) {
+            pending.push({
+                type: 'approve_plan',
+                tool_use_id: this.pendingPlanToolUseId,
+                content: this.pendingPlanInput,
+            });
+        }
+        return pending;
     }
     async cleanup() {
         logger.info('Cleaning up agent service...');

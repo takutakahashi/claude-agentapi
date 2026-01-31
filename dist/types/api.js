@@ -43,11 +43,32 @@ export const ProblemJsonSchema = z.object({
     detail: z.string().optional(),
     instance: z.string().optional(),
 });
-// Action request schema for answering AskUserQuestion
-export const PostActionRequestSchema = z.object({
+// Action request schemas for various agent actions
+export const AnswerQuestionActionSchema = z.object({
+    type: z.literal('answer_question'),
     answers: z.record(z.string(), z.string()),
 });
+export const ApprovePlanActionSchema = z.object({
+    type: z.literal('approve_plan'),
+    approved: z.boolean(),
+});
+export const StopAgentActionSchema = z.object({
+    type: z.literal('stop_agent'),
+});
+export const PostActionRequestSchema = z.discriminatedUnion('type', [
+    AnswerQuestionActionSchema,
+    ApprovePlanActionSchema,
+    StopAgentActionSchema,
+]);
 export const PostActionResponseSchema = z.object({
     ok: z.boolean(),
+});
+export const PendingActionSchema = z.object({
+    type: z.string(),
+    tool_use_id: z.string(),
+    content: z.unknown(),
+});
+export const GetActionResponseSchema = z.object({
+    pending_actions: z.array(PendingActionSchema),
 });
 //# sourceMappingURL=api.js.map

@@ -119,12 +119,43 @@ export interface InitEvent {
     messages: Message[];
     status: 'running' | 'stable';
 }
-export declare const PostActionRequestSchema: z.ZodObject<{
+export declare const AnswerQuestionActionSchema: z.ZodObject<{
+    type: z.ZodLiteral<"answer_question">;
     answers: z.ZodRecord<z.ZodString, z.ZodString>;
 }, z.core.$strip>;
+export declare const ApprovePlanActionSchema: z.ZodObject<{
+    type: z.ZodLiteral<"approve_plan">;
+    approved: z.ZodBoolean;
+}, z.core.$strip>;
+export declare const StopAgentActionSchema: z.ZodObject<{
+    type: z.ZodLiteral<"stop_agent">;
+}, z.core.$strip>;
+export declare const PostActionRequestSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
+    type: z.ZodLiteral<"answer_question">;
+    answers: z.ZodRecord<z.ZodString, z.ZodString>;
+}, z.core.$strip>, z.ZodObject<{
+    type: z.ZodLiteral<"approve_plan">;
+    approved: z.ZodBoolean;
+}, z.core.$strip>, z.ZodObject<{
+    type: z.ZodLiteral<"stop_agent">;
+}, z.core.$strip>], "type">;
 export type PostActionRequest = z.infer<typeof PostActionRequestSchema>;
 export declare const PostActionResponseSchema: z.ZodObject<{
     ok: z.ZodBoolean;
 }, z.core.$strip>;
 export type PostActionResponse = z.infer<typeof PostActionResponseSchema>;
+export declare const PendingActionSchema: z.ZodObject<{
+    type: z.ZodString;
+    tool_use_id: z.ZodString;
+    content: z.ZodUnknown;
+}, z.core.$strip>;
+export type PendingAction = z.infer<typeof PendingActionSchema>;
+export declare const GetActionResponseSchema: z.ZodObject<{
+    pending_actions: z.ZodArray<z.ZodObject<{
+        type: z.ZodString;
+        tool_use_id: z.ZodString;
+        content: z.ZodUnknown;
+    }, z.core.$strip>>;
+}, z.core.$strip>;
+export type GetActionResponse = z.infer<typeof GetActionResponseSchema>;
 //# sourceMappingURL=api.d.ts.map
