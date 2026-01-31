@@ -22,6 +22,10 @@ This project implements a server compatible with the [coder/agentapi](https://gi
 - ✅ TypeScript with strict type checking
 - ✅ Problem+JSON error responses
 
+## Documentation
+
+- 📖 [/action エンドポイント使用ガイド](docs/action-endpoint.md) - エージェントとの対話的なやり取りの詳細な使用方法
+
 ## Prerequisites
 
 - Node.js 20.x or higher
@@ -367,6 +371,8 @@ Send a message to the agent.
 
 ### POST /action
 Send an action to the agent. Supports multiple action types for different agent interactions.
+
+**📖 詳細な使用方法については [/action エンドポイント使用ガイド](docs/action-endpoint.md) を参照してください。**
 
 #### Action Type: `answer_question`
 Answer questions from the AskUserQuestion tool.
