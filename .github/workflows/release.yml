@@ -34,6 +34,12 @@ jobs:
       - name: Run linter
         run: bun run lint
 
+      - name: Update package.json version from tag
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "Updating package.json version to $VERSION"
+          npm version $VERSION --no-git-tag-version
+
       - name: Build project
         run: bun run build
 
