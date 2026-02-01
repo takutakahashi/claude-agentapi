@@ -4,7 +4,7 @@ import type { MessagesResponseBody } from '../types/api.js';
 
 const router = Router();
 
-router.get('/:sessionId/messages', (_req, res) => {
+router.get('/messages', (_req, res) => {
   const allMessages = agentService.getMessages();
   // Filter to only user and assistant messages (exclude tool execution info)
   const messages = allMessages.filter(msg => msg.role === 'user' || msg.role === 'assistant');

@@ -38,7 +38,7 @@ describe('GET /action', () => {
   it('should return empty array when no pending actions', async () => {
     (agentService.getPendingActions as ReturnType<typeof vi.fn>).mockReturnValue([]);
 
-    const response = await request(app).get('/test-session/action');
+    const response = await request(app).get('/action');
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ pending_actions: [] });
@@ -65,7 +65,7 @@ describe('GET /action', () => {
       },
     ]);
 
-    const response = await request(app).get('/test-session/action');
+    const response = await request(app).get('/action');
 
     expect(response.status).toBe(200);
     expect(response.body.pending_actions).toHaveLength(1);
@@ -83,7 +83,7 @@ describe('GET /action', () => {
       },
     ]);
 
-    const response = await request(app).get('/test-session/action');
+    const response = await request(app).get('/action');
 
     expect(response.status).toBe(200);
     expect(response.body.pending_actions).toHaveLength(1);
@@ -105,7 +105,7 @@ describe('GET /action', () => {
       },
     ]);
 
-    const response = await request(app).get('/test-session/action');
+    const response = await request(app).get('/action');
 
     expect(response.status).toBe(200);
     expect(response.body.pending_actions).toHaveLength(2);
@@ -116,7 +116,7 @@ describe('GET /action', () => {
       throw new Error('Test error');
     });
 
-    const response = await request(app).get('/test-session/action');
+    const response = await request(app).get('/action');
 
     expect(response.status).toBe(500);
     expect(response.body).toHaveProperty('title', 'Internal server error');
@@ -133,7 +133,7 @@ describe('POST /action', () => {
   describe('validation', () => {
     it('should reject request without type', async () => {
       const response = await request(app)
-        .post('/test-session/action')
+        .post('/action')
         .send({});
 
       expect(response.status).toBe(400);
@@ -142,7 +142,7 @@ describe('POST /action', () => {
 
     it('should reject request with invalid type', async () => {
       const response = await request(app)
-        .post('/test-session/action')
+        .post('/action')
         .send({ type: 'invalid_type' });
 
       expect(response.status).toBe(400);
@@ -151,7 +151,7 @@ describe('POST /action', () => {
 
     it('should reject answer_question without answers', async () => {
       const response = await request(app)
-        .post('/test-session/action')
+        .post('/action')
         .send({ type: 'answer_question' });
 
       expect(response.status).toBe(400);
@@ -160,7 +160,7 @@ describe('POST /action', () => {
 
     it('should reject approve_plan without approved field', async () => {
       const response = await request(app)
-        .post('/test-session/action')
+        .post('/action')
         .send({ type: 'approve_plan' });
 
       expect(response.status).toBe(400);
@@ -172,7 +172,7 @@ describe('POST /action', () => {
       (agentService.sendAction as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
       const response = await request(app)
-        .post('/test-session/action')
+        .post('/action')
         .send({ type: 'answer_question', answers: {} });
 
       expect(response.status).toBe(200);
@@ -191,7 +191,7 @@ describe('POST /action', () => {
       };
 
       const response = await request(app)
-        .post('/test-session/action')
+        .post('/action')
         .send({ type: 'answer_question', answers });
 
       expect(response.status).toBe(200);
@@ -203,7 +203,7 @@ describe('POST /action', () => {
       (agentService.getStatus as ReturnType<typeof vi.fn>).mockReturnValue('stable');
 
       const response = await request(app)
-        .post('/test-session/action')
+        .post('/action')
         .send({ type: 'answer_question', answers: { q1: 'a1' } });
 
       expect(response.status).toBe(409);
@@ -218,7 +218,7 @@ describe('POST /action', () => {
       );
 
       const response = await request(app)
-        .post('/test-session/action')
+        .post('/action')
         .send({ type: 'answer_question', answers: { q1: 'a1' } });
 
       expect(response.status).toBe(500);
@@ -233,7 +233,7 @@ describe('POST /action', () => {
       (agentService.approvePlan as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
       const response = await request(app)
-        .post('/test-session/action')
+        .post('/action')
         .send({ type: 'approve_plan', approved: true });
 
       expect(response.status).toBe(200);
@@ -246,7 +246,7 @@ describe('POST /action', () => {
       (agentService.approvePlan as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
       const response = await request(app)
-        .post('/test-session/action')
+        .post('/action')
         .send({ type: 'approve_plan', approved: false });
 
       expect(response.status).toBe(200);
@@ -258,7 +258,7 @@ describe('POST /action', () => {
       (agentService.getStatus as ReturnType<typeof vi.fn>).mockReturnValue('stable');
 
       const response = await request(app)
-        .post('/test-session/action')
+        .post('/action')
         .send({ type: 'approve_plan', approved: true });
 
       expect(response.status).toBe(409);
@@ -273,7 +273,7 @@ describe('POST /action', () => {
       );
 
       const response = await request(app)
-        .post('/test-session/action')
+        .post('/action')
         .send({ type: 'approve_plan', approved: true });
 
       expect(response.status).toBe(500);
@@ -287,7 +287,7 @@ describe('POST /action', () => {
       (agentService.stopAgent as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
       const response = await request(app)
-        .post('/test-session/action')
+        .post('/action')
         .send({ type: 'stop_agent' });
 
       expect(response.status).toBe(200);
@@ -301,7 +301,7 @@ describe('POST /action', () => {
       );
 
       const response = await request(app)
-        .post('/test-session/action')
+        .post('/action')
         .send({ type: 'stop_agent' });
 
       expect(response.status).toBe(500);
