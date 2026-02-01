@@ -10,8 +10,10 @@ export declare class AgentService {
     private messageIdCounter;
     private pendingQuestionToolUseId;
     private pendingQuestionInput;
+    private pendingQuestionResolve;
     private pendingPlanToolUseId;
     private pendingPlanInput;
+    private pendingPlanResolve;
     initialize(): Promise<void>;
     private processQuery;
     sendMessage(content: string): Promise<void>;
