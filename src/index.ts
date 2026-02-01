@@ -6,6 +6,11 @@ import { initializeTelemetry, shutdownTelemetry } from './utils/telemetry.js';
 import { initializeMetricsService } from './services/metrics.js';
 import { randomUUID } from 'crypto';
 
+// Parse command line arguments
+if (process.argv.includes('--dangerously-skip-permissions')) {
+  process.env.DANGEROUSLY_SKIP_PERMISSIONS = 'true';
+}
+
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || 'localhost';
 const TELEMETRY_ENABLED = process.env.CLAUDE_CODE_ENABLE_TELEMETRY === '1';
