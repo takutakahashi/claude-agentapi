@@ -106,10 +106,14 @@ export class AgentService {
                     logger.info('User answer received, returning to SDK', {
                         answers_preview: JSON.stringify(answers).substring(0, 200),
                     });
-                    // Return permission result with user answers as updatedInput
+                    // Return permission result with user answers merged into the original input
+                    // This preserves the original 'questions' field while adding 'answers'
+                    const mergedInput = typeof toolInput === 'object' && toolInput !== null
+                        ? { ...toolInput, answers }
+                        : { answers };
                     return {
                         behavior: 'allow',
-                        updatedInput: { answers },
+                        updatedInput: mergedInput,
                     };
                 }
                 if (toolName === 'ExitPlanMode') {

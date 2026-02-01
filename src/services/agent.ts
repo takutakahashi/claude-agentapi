@@ -127,10 +127,15 @@ export class AgentService {
             answers_preview: JSON.stringify(answers).substring(0, 200),
           });
 
-          // Return permission result with user answers as updatedInput
+          // Return permission result with user answers merged into the original input
+          // This preserves the original 'questions' field while adding 'answers'
+          const mergedInput = typeof toolInput === 'object' && toolInput !== null
+            ? { ...toolInput as Record<string, unknown>, answers }
+            : { answers };
+
           return {
             behavior: 'allow' as const,
-            updatedInput: { answers } as Record<string, unknown>,
+            updatedInput: mergedInput as Record<string, unknown>,
           };
         }
 
@@ -270,7 +275,7 @@ export class AgentService {
     }
   }
 
-  async sendAction(answers: Record<string, string>): Promise<void> {
+  async sendAction(answers: Record<string, string | string[]>): Promise<void> {
     logger.debug('sendAction called', {
       answers_keys: Object.keys(answers),
       current_status: this.status,

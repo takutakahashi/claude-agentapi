@@ -199,6 +199,24 @@ describe('POST /action', () => {
       expect(agentService.sendAction).toHaveBeenCalledWith(answers);
     });
 
+    it('should accept multi-select answers (string arrays)', async () => {
+      (agentService.getStatus as ReturnType<typeof vi.fn>).mockReturnValue('running');
+      (agentService.sendAction as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+
+      const answers = {
+        '0': ['option1', 'option2'],
+        '1': 'single answer',
+      };
+
+      const response = await request(app)
+        .post('/action')
+        .send({ type: 'answer_question', answers });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ ok: true });
+      expect(agentService.sendAction).toHaveBeenCalledWith(answers);
+    });
+
     it('should reject answer_question when agent is stable', async () => {
       (agentService.getStatus as ReturnType<typeof vi.fn>).mockReturnValue('stable');
 
