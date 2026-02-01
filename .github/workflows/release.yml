@@ -14,7 +14,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
       id-token: write
 
     steps:
@@ -38,19 +37,7 @@ jobs:
       - name: Build project
         run: bun run build
 
-      - name: Setup Node.js for GitHub Packages
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.x'
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@takutakahashi'
-
-      - name: Publish to GitHub Packages
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup Node.js for npmjs
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20.x'
@@ -110,8 +97,6 @@ jobs:
           body: |
             ## npm Package
 
-            ### Install from npmjs (Recommended)
-
             ```bash
             # Install globally
             npm install -g @takutakahashi/claude-agentapi@${{ github.ref_name }}
@@ -123,16 +108,6 @@ jobs:
             npx @takutakahashi/claude-agentapi
             ```
 
-            ### Install from GitHub Packages
-
-            ```bash
-            # Configure npm to use GitHub Packages
-            echo "@takutakahashi:registry=https://npm.pkg.github.com" >> .npmrc
-
-            # Install globally
-            npm install -g @takutakahashi/claude-agentapi@${{ github.ref_name }}
-            ```
-
             ## Docker Image
 
             ```bash
@@ -141,5 +116,4 @@ jobs:
 
             Available on:
             - npmjs: `@takutakahashi/claude-agentapi`
-            - GitHub Packages (npm): `@takutakahashi/claude-agentapi`
             - GitHub Container Registry: `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}`
