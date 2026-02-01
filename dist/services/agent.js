@@ -40,8 +40,10 @@ export class AgentService {
     messageIdCounter = 0;
     pendingQuestionToolUseId = null;
     pendingQuestionInput = null;
+    pendingQuestionResolve = null;
     pendingPlanToolUseId = null;
     pendingPlanInput = null;
+    pendingPlanResolve = null;
     async initialize() {
         try {
             logger.info('Initializing Claude Agent SDK with v1 API...');
@@ -87,6 +89,59 @@ export class AgentService {
                 logger.info(`Configuring setting sources: ${config.settingSources.join(', ')}...`);
                 queryOptions.options.settingSources = config.settingSources;
             }
+            // Add canUseTool callback to handle AskUserQuestion and ExitPlanMode without timeout
+            queryOptions.options.canUseTool = async (toolName, toolInput) => {
+                logger.debug('canUseTool callback triggered', {
+                    tool_name: toolName,
+                    has_input: !!toolInput,
+                });
+                if (toolName === 'AskUserQuestion') {
+                    logger.info('AskUserQuestion detected in canUseTool, waiting for user response...');
+                    // Create a promise that will be resolved when user sends answer via /action
+                    const answerPromise = new Promise((resolve) => {
+                        this.pendingQuestionResolve = resolve;
+                    });
+                    // Wait indefinitely for user response (no timeout)
+                    const answers = await answerPromise;
+                    logger.info('User answer received, returning to SDK', {
+                        answers_preview: JSON.stringify(answers).substring(0, 200),
+                    });
+                    // Return permission result with user answers as updatedInput
+                    return {
+                        behavior: 'allow',
+                        updatedInput: { answers },
+                    };
+                }
+                if (toolName === 'ExitPlanMode') {
+                    logger.info('ExitPlanMode detected in canUseTool, waiting for user approval...');
+                    // Create a promise that will be resolved when user sends approval via /action
+                    const approvalPromise = new Promise((resolve) => {
+                        this.pendingPlanResolve = resolve;
+                    });
+                    // Wait indefinitely for user approval (no timeout)
+                    const approved = await approvalPromise;
+                    logger.info('User plan approval received, returning to SDK', {
+                        approved,
+                    });
+                    if (!approved) {
+                        // User rejected the plan
+                        return {
+                            behavior: 'deny',
+                            message: 'User rejected the plan',
+                        };
+                    }
+                    // User approved the plan
+                    return {
+                        behavior: 'allow',
+                        updatedInput: toolInput,
+                    };
+                }
+                // For all other tools, allow execution
+                return {
+                    behavior: 'allow',
+                    updatedInput: toolInput,
+                };
+            };
             // Create input stream manager
             this.inputStreamManager = new InputStreamManager();
             // Create query with streaming input
@@ -128,8 +183,10 @@ export class AgentService {
                 });
                 this.pendingQuestionToolUseId = null;
                 this.pendingQuestionInput = null;
+                this.pendingQuestionResolve = null;
                 this.pendingPlanToolUseId = null;
                 this.pendingPlanInput = null;
+                this.pendingPlanResolve = null;
                 this.activeToolExecutions = [];
             }
             this.setStatus('stable');
@@ -210,39 +267,24 @@ export class AgentService {
             const userMessage = this.addMessage('user', answerText);
             sessionService.broadcastMessageUpdate(userMessage);
             logger.debug('User answer message created and broadcasted', { message_id: userMessage.id });
-            // Prepare tool_result message
-            const toolResultMessage = {
-                type: 'user',
-                message: {
-                    role: 'user',
-                    content: [
-                        {
-                            type: 'tool_result',
-                            tool_use_id: toolUseId,
-                            content: JSON.stringify(answers),
-                        },
-                    ],
-                },
-                parent_tool_use_id: null,
-                session_id: 'default',
-            };
-            logger.debug('Sending tool_result to SDK', {
-                tool_use_id: toolUseId,
-                content_preview: JSON.stringify(answers).substring(0, 200),
-            });
-            // Send answer as tool_result through input stream
-            this.inputStreamManager.send(toolResultMessage);
-            logger.info('tool_result sent successfully', {
-                tool_use_id: toolUseId,
-            });
+            // Resolve the canUseTool promise with the answers
+            if (this.pendingQuestionResolve) {
+                logger.info('Resolving canUseTool promise with user answers', {
+                    tool_use_id: toolUseId,
+                    answers_preview: JSON.stringify(answers).substring(0, 200),
+                });
+                this.pendingQuestionResolve(answers);
+                this.pendingQuestionResolve = null;
+            }
+            else {
+                logger.warn('No pending question resolve function found');
+            }
             // Clear the pending question
             this.pendingQuestionToolUseId = null;
             this.pendingQuestionInput = null;
             logger.debug('Pending question cleared', {
                 has_pending_question: !!this.pendingQuestionToolUseId,
             });
-            // Wait a bit for processing to complete
-            await new Promise(resolve => setTimeout(resolve, 100));
         }
         catch (error) {
             logger.error('Error processing action', {
@@ -295,40 +337,24 @@ export class AgentService {
             const userMessage = this.addMessage('user', approvalText);
             sessionService.broadcastMessageUpdate(userMessage);
             logger.debug('User approval message created and broadcasted', { message_id: userMessage.id });
-            // Prepare tool_result message
-            const toolResultMessage = {
-                type: 'user',
-                message: {
-                    role: 'user',
-                    content: [
-                        {
-                            type: 'tool_result',
-                            tool_use_id: toolUseId,
-                            content: approved ? 'approved' : 'rejected',
-                        },
-                    ],
-                },
-                parent_tool_use_id: null,
-                session_id: 'default',
-            };
-            logger.debug('Sending tool_result to SDK', {
-                tool_use_id: toolUseId,
-                content: approved ? 'approved' : 'rejected',
-            });
-            // Send approval/rejection as tool_result through input stream
-            this.inputStreamManager.send(toolResultMessage);
-            logger.info('tool_result sent successfully', {
-                tool_use_id: toolUseId,
-                approved,
-            });
+            // Resolve the canUseTool promise with the approval status
+            if (this.pendingPlanResolve) {
+                logger.info('Resolving canUseTool promise with plan approval', {
+                    tool_use_id: toolUseId,
+                    approved,
+                });
+                this.pendingPlanResolve(approved);
+                this.pendingPlanResolve = null;
+            }
+            else {
+                logger.warn('No pending plan resolve function found');
+            }
             // Clear the pending plan
             this.pendingPlanToolUseId = null;
             this.pendingPlanInput = null;
             logger.debug('Pending plan cleared', {
                 has_pending_plan: !!this.pendingPlanToolUseId,
             });
-            // Wait a bit for processing to complete
-            await new Promise(resolve => setTimeout(resolve, 100));
         }
         catch (error) {
             logger.error('Error processing plan approval', {
@@ -357,8 +383,10 @@ export class AgentService {
                 });
                 this.pendingQuestionToolUseId = null;
                 this.pendingQuestionInput = null;
+                this.pendingQuestionResolve = null;
                 this.pendingPlanToolUseId = null;
                 this.pendingPlanInput = null;
+                this.pendingPlanResolve = null;
                 this.activeToolExecutions = [];
             }
             // Set status to stable
@@ -532,8 +560,10 @@ export class AgentService {
                         });
                         this.pendingQuestionToolUseId = null;
                         this.pendingQuestionInput = null;
+                        this.pendingQuestionResolve = null;
                         this.pendingPlanToolUseId = null;
                         this.pendingPlanInput = null;
+                        this.pendingPlanResolve = null;
                         this.activeToolExecutions = [];
                     }
                     this.setStatus('stable');
@@ -859,8 +889,10 @@ export class AgentService {
             });
             this.pendingQuestionToolUseId = null;
             this.pendingQuestionInput = null;
+            this.pendingQuestionResolve = null;
             this.pendingPlanToolUseId = null;
             this.pendingPlanInput = null;
+            this.pendingPlanResolve = null;
             this.activeToolExecutions = [];
         }
         // Record session end metrics

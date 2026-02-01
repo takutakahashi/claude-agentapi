@@ -33,6 +33,9 @@ async function main() {
             logger.info('  GET  /messages        - Message history');
             logger.info('  POST /message         - Send message to agent');
             logger.info('  GET  /events          - SSE event stream');
+            logger.info('  GET  /tool_status     - Tool execution status');
+            logger.info('  GET  /action          - Get pending actions');
+            logger.info('  POST /action          - Send action response (answer_question, approve_plan, stop_agent)');
             if (TELEMETRY_ENABLED) {
                 logger.info(`\nPrometheus metrics:`);
                 logger.info(`  GET  http://${HOST}:${PROMETHEUS_PORT}/metrics`);
