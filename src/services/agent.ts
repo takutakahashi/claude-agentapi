@@ -275,7 +275,7 @@ export class AgentService {
     }
   }
 
-  async sendAction(answers: Record<string, string>): Promise<void> {
+  async sendAction(answers: Record<string, string | string[]>): Promise<void> {
     logger.debug('sendAction called', {
       answers_keys: Object.keys(answers),
       current_status: this.status,
