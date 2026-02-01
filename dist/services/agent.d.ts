@@ -17,7 +17,7 @@ export declare class AgentService {
     initialize(): Promise<void>;
     private processQuery;
     sendMessage(content: string): Promise<void>;
-    sendAction(answers: Record<string, string>): Promise<void>;
+    sendAction(answers: Record<string, string | string[]>): Promise<void>;
     approvePlan(approved: boolean): Promise<void>;
     stopAgent(): Promise<void>;
     private processSDKMessage;

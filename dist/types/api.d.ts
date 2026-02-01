@@ -121,7 +121,7 @@ export interface InitEvent {
 }
 export declare const AnswerQuestionActionSchema: z.ZodObject<{
     type: z.ZodLiteral<"answer_question">;
-    answers: z.ZodRecord<z.ZodString, z.ZodString>;
+    answers: z.ZodRecord<z.ZodString, z.ZodUnion<readonly [z.ZodString, z.ZodArray<z.ZodString>]>>;
 }, z.core.$strip>;
 export declare const ApprovePlanActionSchema: z.ZodObject<{
     type: z.ZodLiteral<"approve_plan">;
@@ -132,7 +132,7 @@ export declare const StopAgentActionSchema: z.ZodObject<{
 }, z.core.$strip>;
 export declare const PostActionRequestSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
     type: z.ZodLiteral<"answer_question">;
-    answers: z.ZodRecord<z.ZodString, z.ZodString>;
+    answers: z.ZodRecord<z.ZodString, z.ZodUnion<readonly [z.ZodString, z.ZodArray<z.ZodString>]>>;
 }, z.core.$strip>, z.ZodObject<{
     type: z.ZodLiteral<"approve_plan">;
     approved: z.ZodBoolean;
