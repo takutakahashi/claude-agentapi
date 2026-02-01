@@ -15,6 +15,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
 
     steps:
       - name: Checkout code
@@ -24,13 +25,6 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.x'
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@takutakahashi'
 
       - name: Install dependencies
         run: bun install
@@ -44,10 +38,28 @@ jobs:
       - name: Build project
         run: bun run build
 
+      - name: Setup Node.js for GitHub Packages
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@takutakahashi'
+
       - name: Publish to GitHub Packages
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js for npmjs
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish to npmjs
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   build-and-push:
     runs-on: ubuntu-latest
@@ -96,7 +108,22 @@ jobs:
         with:
           generate_release_notes: true
           body: |
-            ## npm Package (GitHub Packages)
+            ## npm Package
+
+            ### Install from npmjs (Recommended)
+
+            ```bash
+            # Install globally
+            npm install -g @takutakahashi/claude-agentapi@${{ github.ref_name }}
+
+            # Or with bun
+            bun install -g @takutakahashi/claude-agentapi@${{ github.ref_name }}
+
+            # Or run directly
+            npx @takutakahashi/claude-agentapi
+            ```
+
+            ### Install from GitHub Packages
 
             ```bash
             # Configure npm to use GitHub Packages
@@ -104,9 +131,6 @@ jobs:
 
             # Install globally
             npm install -g @takutakahashi/claude-agentapi@${{ github.ref_name }}
-
-            # Or run directly
-            npx @takutakahashi/claude-agentapi
             ```
 
             ## Docker Image
@@ -116,5 +140,6 @@ jobs:
             ```
 
             Available on:
+            - npmjs: `@takutakahashi/claude-agentapi`
             - GitHub Packages (npm): `@takutakahashi/claude-agentapi`
             - GitHub Container Registry: `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}`
