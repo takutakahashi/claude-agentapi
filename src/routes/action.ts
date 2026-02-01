@@ -39,7 +39,7 @@ router.post('/action', async (req, res) => {
 
     if (!validation.success) {
       logger.error('POST /action validation failed:', validation.error.message);
-      logger.error('Validation errors:', JSON.stringify(validation.error.errors));
+      logger.error('Validation errors:', JSON.stringify(validation.error.issues));
       const error: ProblemJson = {
         type: 'about:blank',
         title: 'Invalid request',
