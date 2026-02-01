@@ -85,7 +85,7 @@ export interface InitEvent {
 // Action request schemas for various agent actions
 export const AnswerQuestionActionSchema = z.object({
   type: z.literal('answer_question'),
-  answers: z.record(z.string(), z.string()),
+  answers: z.record(z.string(), z.union([z.string(), z.array(z.string())])),
 });
 
 export const ApprovePlanActionSchema = z.object({

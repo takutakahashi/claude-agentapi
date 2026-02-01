@@ -6,7 +6,7 @@ import { logger } from '../utils/logger.js';
 
 const router = Router();
 
-router.get('/action', async (_req, res) => {
+router.get('/:sessionId/action', async (_req, res) => {
   try {
     const pendingActions = agentService.getPendingActions();
 
@@ -29,7 +29,7 @@ router.get('/action', async (_req, res) => {
   }
 });
 
-router.post('/action', async (req, res) => {
+router.post('/:sessionId/action', async (req, res) => {
   try {
     // Validate request body
     const validation = PostActionRequestSchema.safeParse(req.body);

@@ -6,7 +6,7 @@ import { logger } from '../utils/logger.js';
 
 const router = Router();
 
-router.post('/message', async (req, res) => {
+router.post('/:sessionId/message', async (req, res) => {
   try {
     // Validate request body
     const validation = PostMessageRequestSchema.safeParse(req.body);

@@ -8,7 +8,7 @@ const router = Router();
 
 let clientIdCounter = 0;
 
-router.get('/events', (req, res) => {
+router.get('/:sessionId/events', (req, res) => {
   // Generate unique client ID
   const clientId = `client_${++clientIdCounter}_${Date.now()}`;
 
