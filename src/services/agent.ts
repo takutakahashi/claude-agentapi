@@ -256,7 +256,7 @@ export class AgentService {
             {
               type: 'tool_result' as const,
               tool_use_id: toolUseId,
-              content: JSON.stringify({ answers }),
+              content: JSON.stringify(answers),
             },
           ],
         },
@@ -266,7 +266,7 @@ export class AgentService {
 
       logger.debug('Sending tool_result to SDK', {
         tool_use_id: toolUseId,
-        content_preview: JSON.stringify({ answers }).substring(0, 200),
+        content_preview: JSON.stringify(answers).substring(0, 200),
       });
 
       // Send answer as tool_result through input stream
