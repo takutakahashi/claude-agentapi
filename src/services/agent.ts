@@ -836,12 +836,12 @@ export class AgentService {
   }
 
   private formatPlan(input: unknown): string {
-    // Format ExitPlanMode input as readable text
+    // Format ExitPlanMode input as JSON
     if (typeof input === 'string') {
-      return `📋 Plan ready for approval:\n${input}`;
+      return input;
     }
 
-    return `📋 Plan ready for approval:\n${JSON.stringify(input, null, 2)}`;
+    return JSON.stringify(input, null, 2);
   }
 
   private recordResultMetrics(msg: { type: 'result'; [key: string]: unknown }): void {
