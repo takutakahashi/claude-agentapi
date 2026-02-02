@@ -79,7 +79,7 @@ describe('GET /messages', () => {
     expect(agentService.getMessages).toHaveBeenCalledOnce();
   });
 
-  it('should filter out agent and tool_result messages', async () => {
+  it('should include all message types including agent and tool_result', async () => {
     const mockMessages: Message[] = [
       {
         id: 0,
@@ -115,8 +115,10 @@ describe('GET /messages', () => {
     const response = await request(app).get('/messages');
 
     expect(response.status).toBe(200);
-    expect(response.body.messages).toHaveLength(2);
+    expect(response.body.messages).toHaveLength(4);
     expect(response.body.messages[0].role).toBe('user');
     expect(response.body.messages[1].role).toBe('assistant');
+    expect(response.body.messages[2].role).toBe('agent');
+    expect(response.body.messages[3].role).toBe('tool_result');
   });
 });
