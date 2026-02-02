@@ -124,3 +124,19 @@ export const GetActionResponseSchema = z.object({
 });
 
 export type GetActionResponse = z.infer<typeof GetActionResponseSchema>;
+
+// Resource types for /resources endpoint
+export const ResourceSchema = z.object({
+  type: z.enum(['skill', 'command', 'subagent']),
+  name: z.string(),
+  description: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type Resource = z.infer<typeof ResourceSchema>;
+
+export const ResourcesResponseSchema = z.object({
+  resources: z.array(ResourceSchema),
+});
+
+export type ResourcesResponse = z.infer<typeof ResourcesResponseSchema>;

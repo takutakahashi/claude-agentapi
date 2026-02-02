@@ -51,6 +51,8 @@ export type MCPServersConfig = Record<string, MCPServerConfig>;
 export interface PluginConfig {
   /** Whether the plugin is enabled */
   enabled?: boolean;
+  /** Description of the plugin */
+  description?: string;
   /** Plugin-specific configuration */
   config?: Record<string, unknown>;
 }
