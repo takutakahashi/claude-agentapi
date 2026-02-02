@@ -5,9 +5,8 @@ import type { MessagesResponseBody } from '../types/api.js';
 const router = Router();
 
 router.get('/messages', (_req, res) => {
-  const allMessages = agentService.getMessages();
-  // Filter to only user and assistant messages (exclude tool execution info)
-  const messages = allMessages.filter(msg => msg.role === 'user' || msg.role === 'assistant');
+  // Get all messages including tool execution history (agent and tool_result roles)
+  const messages = agentService.getMessages();
   const response: MessagesResponseBody = {
     $schema: 'https://10.42.2.198:9000/schemas/MessagesResponseBody.json',
     messages,
