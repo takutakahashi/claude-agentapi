@@ -11,6 +11,13 @@ if (process.argv.includes('--dangerously-skip-permissions')) {
   process.env.DANGEROUSLY_SKIP_PERMISSIONS = 'true';
 }
 
+// Set ANTHROPIC_MODEL from CLAUDE_MODEL for Bedrock compatibility
+// AWS Bedrock requires ANTHROPIC_MODEL environment variable to be set
+if (process.env.CLAUDE_MODEL && !process.env.ANTHROPIC_MODEL) {
+  process.env.ANTHROPIC_MODEL = process.env.CLAUDE_MODEL;
+  logger.debug(`Set ANTHROPIC_MODEL=${process.env.ANTHROPIC_MODEL} from CLAUDE_MODEL`);
+}
+
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || 'localhost';
 const TELEMETRY_ENABLED = process.env.CLAUDE_CODE_ENABLE_TELEMETRY === '1';
