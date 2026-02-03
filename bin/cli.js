@@ -20,7 +20,7 @@ Options:
 Environment Variables:
   PORT                               Server port (default: 3000)
   HOST                               Server host (default: localhost)
-  CLAUDE_MODEL                       Claude model name (default: claude-sonnet-4-5-20250929)
+  ANTHROPIC_MODEL                    Claude model name (default: claude-sonnet-4-5-20250929)
   CLAUDE_CODE_USE_BEDROCK           Use AWS Bedrock (1) or Anthropic API (0)
   AWS_REGION                        AWS region (when using Bedrock)
   AWS_ACCESS_KEY_ID                 AWS access key (when using Bedrock)
