@@ -44,7 +44,7 @@ cat > .env << 'EOF'
 PORT=3000
 HOST=localhost
 CLAUDE_CODE_USE_BEDROCK=0
-CLAUDE_MODEL=claude-sonnet-4-5-20250929
+ANTHROPIC_MODEL=claude-sonnet-4-5-20250929
 ANTHROPIC_OAUTH_TOKEN=your_oauth_token_here
 EOF
 
@@ -67,7 +67,7 @@ cat > .env << 'EOF'
 PORT=3000
 HOST=localhost
 CLAUDE_CODE_USE_BEDROCK=0
-CLAUDE_MODEL=claude-sonnet-4-5-20250929
+ANTHROPIC_MODEL=claude-sonnet-4-5-20250929
 ANTHROPIC_OAUTH_TOKEN=your_oauth_token_here
 EOF
 
@@ -170,8 +170,8 @@ Create a `.env` file based on `.env.example`:
 - `PORT` - Server port (default: 3000)
 - `HOST` - Server host (default: localhost)
 
-#### Claude Configuration
-- `CLAUDE_MODEL` - Claude model name (default: claude-sonnet-4-5-20250929)
+#### Model Configuration
+- `ANTHROPIC_MODEL` - Claude model name (default: claude-sonnet-4-5-20250929)
 
 #### AWS Bedrock Configuration (when using Bedrock)
 - `CLAUDE_CODE_USE_BEDROCK=1` - Enable Bedrock
