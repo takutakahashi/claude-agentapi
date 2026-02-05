@@ -6,7 +6,13 @@ import { logger } from '../utils/logger.js';
 import { resolveConfig } from '../utils/config.js';
 import { getMetricsService } from './metrics.js';
 
-const MAX_MESSAGE_HISTORY = parseInt(process.env.MAX_MESSAGE_HISTORY || '100000', 10);
+// Maximum number of messages to keep in API response history (unlimited by default)
+// Set to 0 for unlimited. This does not affect Claude SDK's internal message management.
+const MAX_MESSAGE_HISTORY = parseInt(process.env.MAX_MESSAGE_HISTORY || '0', 10);
+
+// Maximum number of conversation turns for Claude SDK (100 messages ≈ 50 turns)
+// This controls how much context is sent to Claude API
+const MAX_CLAUDE_TURNS = parseInt(process.env.MAX_CLAUDE_TURNS || '50', 10);
 
 // Helper class to manage streaming input
 class InputStreamManager {
@@ -66,6 +72,7 @@ export class AgentService {
           model,
           cwd: config.workingDirectory,
           permissionMode: config.permissionMode,
+          maxTurns: MAX_CLAUDE_TURNS, // Limit conversation turns to control cost
         },
       };
 
@@ -977,8 +984,8 @@ export class AgentService {
 
     this.messages.push(message);
 
-    // Trim message history if it exceeds the limit
-    if (this.messages.length > MAX_MESSAGE_HISTORY) {
+    // Trim message history if it exceeds the limit (0 means unlimited)
+    if (MAX_MESSAGE_HISTORY > 0 && this.messages.length > MAX_MESSAGE_HISTORY) {
       this.messages = this.messages.slice(-MAX_MESSAGE_HISTORY);
       logger.debug(`Message history trimmed to ${MAX_MESSAGE_HISTORY} messages`);
     }

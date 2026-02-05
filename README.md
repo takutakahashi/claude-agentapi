@@ -201,7 +201,8 @@ Use either API Key or OAuth Token (not both):
 
 #### Other Configuration
 - `DEBUG` - Enable debug logging (default: false)
-- `MAX_MESSAGE_HISTORY` - Maximum messages to keep in history (default: 100)
+- `MAX_MESSAGE_HISTORY` - Maximum messages to keep in GET /messages API response. Set to 0 for unlimited (default: 0, unlimited)
+- `MAX_CLAUDE_TURNS` - Maximum conversation turns for Claude SDK to control cost. 1 turn = user message + assistant response (default: 50, approximately 100 messages)
 
 ## Usage
 
