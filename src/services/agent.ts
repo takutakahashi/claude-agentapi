@@ -57,7 +57,7 @@ export class AgentService {
       // Resolve configuration from .claude/config.json and environment variables
       const config = await resolveConfig();
 
-      const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5-20250929';
+      const model = process.env.ANTHROPIC_MODEL || 'default';
 
       // Build query options with v1 API
       const queryOptions: Parameters<typeof query>[0] = {
@@ -849,7 +849,7 @@ export class AgentService {
     if (!metricsService) return;
 
     try {
-      const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5-20250929';
+      const model = process.env.ANTHROPIC_MODEL || 'default';
 
       // Record cost if available
       if ('total_cost_usd' in msg && typeof msg.total_cost_usd === 'number') {
