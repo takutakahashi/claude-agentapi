@@ -119,6 +119,10 @@ export interface ClaudeConfig {
   allowedTools?: string[];
   /** Environment variables */
   env?: Record<string, string>;
+  /** Subagent definitions */
+  agents?: Record<string, AgentDefinition>;
+  /** Token optimization settings */
+  tokenOptimization?: TokenOptimizationConfig;
 }
 
 /**
@@ -154,6 +158,44 @@ export interface SdkPluginConfig {
 export type SettingSource = 'user' | 'project' | 'local';
 
 /**
+ * Agent definition for subagents
+ * Allows creating specialized agents with specific tools and prompts
+ */
+export interface AgentDefinition {
+  /** Description of what this agent does */
+  description: string;
+  /** System prompt for the agent */
+  prompt: string;
+  /** List of tools this agent can use */
+  tools?: string[];
+  /** Model to use for this agent ('sonnet' | 'opus' | 'haiku' | 'inherit') */
+  model?: 'haiku' | 'sonnet' | 'opus' | 'inherit';
+}
+
+/**
+ * SDK beta features
+ */
+export type SdkBeta = 'context-1m-2025-08-07' | string;
+
+/**
+ * Token optimization configuration
+ */
+export interface TokenOptimizationConfig {
+  /** Enable extended context window (1M tokens) via beta features */
+  enableExtendedContext?: boolean;
+  /** Beta features to enable (e.g., 'context-1m-2025-08-07') */
+  betas?: SdkBeta[];
+  /** Maximum budget in USD for this session */
+  maxBudgetUsd?: number;
+  /** Maximum number of thinking tokens */
+  maxThinkingTokens?: number;
+  /** Maximum number of conversation turns */
+  maxTurns?: number;
+  /** Maximum message history to keep (defaults to MAX_MESSAGE_HISTORY env var or 100000) */
+  maxMessageHistory?: number;
+}
+
+/**
  * Merged configuration with environment variable overrides
  */
 export interface ResolvedConfig {
@@ -177,4 +219,8 @@ export interface ResolvedConfig {
   env?: Record<string, string>;
   /** Setting sources for loading CLAUDE.md and settings files */
   settingSources?: SettingSource[];
+  /** Subagent definitions */
+  agents?: Record<string, AgentDefinition>;
+  /** Token optimization settings */
+  tokenOptimization?: TokenOptimizationConfig;
 }

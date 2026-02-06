@@ -84,5 +84,26 @@
       "args": ["test"],
       "description": "Run the test suite"
     }
+  },
+  "agents": {
+    "code-reviewer": {
+      "description": "Expert code review specialist for security and maintainability",
+      "prompt": "You are a code review specialist. Focus on security vulnerabilities, performance issues, and code maintainability.",
+      "tools": ["Read", "Grep", "Glob"],
+      "model": "sonnet"
+    },
+    "explorer": {
+      "description": "Fast codebase exploration specialist",
+      "prompt": "You are a codebase exploration specialist. Quickly find and summarize relevant code.",
+      "tools": ["Read", "Grep", "Glob", "find_symbol"],
+      "model": "haiku"
+    }
+  },
+  "tokenOptimization": {
+    "enableExtendedContext": true,
+    "maxBudgetUsd": 10.0,
+    "maxThinkingTokens": 10000,
+    "maxTurns": 50,
+    "maxMessageHistory": 10000
   }
 }
