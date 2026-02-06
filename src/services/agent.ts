@@ -69,6 +69,12 @@ export class AgentService {
         },
       };
 
+      // Add pathToClaudeCodeExecutable if configured via environment variable
+      if (process.env.CLAUDE_CODE_EXECUTABLE_PATH) {
+        logger.info(`Using custom Claude Code executable: ${process.env.CLAUDE_CODE_EXECUTABLE_PATH}`);
+        queryOptions.options!.pathToClaudeCodeExecutable = process.env.CLAUDE_CODE_EXECUTABLE_PATH;
+      }
+
       // Add MCP servers if configured
       if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
         logger.info(`Configuring ${Object.keys(config.mcpServers).length} MCP server(s)...`);
