@@ -189,6 +189,7 @@ Use either API Key or OAuth Token (not both):
 - `CLAUDE_WORKING_DIRECTORY` - Working directory for the agent (default: current working directory)
 - `CLAUDE_PERMISSION_MODE` - Permission mode: `default`, `acceptEdits`, or `bypassPermissions` (default: default)
 - `DANGEROUSLY_SKIP_PERMISSIONS` - Set to `true` to skip all permission checks (equivalent to `bypassPermissions` mode)
+- `CLAUDE_CODE_EXECUTABLE_PATH` - Custom path to Claude Code executable (optional, uses SDK built-in executable by default)
 
 **Permission Modes:**
 - `default` - Standard permission checks with user prompts for confirmations
