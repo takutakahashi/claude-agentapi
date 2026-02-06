@@ -170,6 +170,31 @@ function mergeConfigs(configs: ClaudeConfig[]): ClaudeConfig {
         ...config.env,
       };
     }
+
+    // Merge agents
+    if (config.agents) {
+      merged.agents = {
+        ...merged.agents,
+        ...config.agents,
+      };
+    }
+
+    // Merge tokenOptimization
+    if (config.tokenOptimization) {
+      merged.tokenOptimization = {
+        ...merged.tokenOptimization,
+        ...config.tokenOptimization,
+      };
+      // Merge betas array if both exist
+      if (merged.tokenOptimization.betas && config.tokenOptimization.betas) {
+        merged.tokenOptimization.betas = [
+          ...new Set([
+            ...(merged.tokenOptimization.betas || []),
+            ...config.tokenOptimization.betas,
+          ]),
+        ];
+      }
+    }
   }
 
   return merged;
@@ -330,6 +355,28 @@ export async function resolveConfig(): Promise<ResolvedConfig> {
     }
   }
 
+  // Process token optimization config with environment variable overrides
+  let tokenOptimization = claudeConfig.tokenOptimization;
+  if (tokenOptimization || process.env.CLAUDE_ENABLE_EXTENDED_CONTEXT ||
+      process.env.CLAUDE_MAX_BUDGET_USD || process.env.CLAUDE_MAX_THINKING_TOKENS ||
+      process.env.CLAUDE_MAX_TURNS || process.env.MAX_MESSAGE_HISTORY) {
+    tokenOptimization = {
+      ...tokenOptimization,
+      enableExtendedContext: process.env.CLAUDE_ENABLE_EXTENDED_CONTEXT === 'true' || tokenOptimization?.enableExtendedContext,
+      maxBudgetUsd: process.env.CLAUDE_MAX_BUDGET_USD ? parseFloat(process.env.CLAUDE_MAX_BUDGET_USD) : tokenOptimization?.maxBudgetUsd,
+      maxThinkingTokens: process.env.CLAUDE_MAX_THINKING_TOKENS ? parseInt(process.env.CLAUDE_MAX_THINKING_TOKENS, 10) : tokenOptimization?.maxThinkingTokens,
+      maxTurns: process.env.CLAUDE_MAX_TURNS ? parseInt(process.env.CLAUDE_MAX_TURNS, 10) : tokenOptimization?.maxTurns,
+      maxMessageHistory: process.env.MAX_MESSAGE_HISTORY ? parseInt(process.env.MAX_MESSAGE_HISTORY, 10) : tokenOptimization?.maxMessageHistory,
+    };
+
+    // Add extended context beta if enabled
+    if (tokenOptimization.enableExtendedContext) {
+      tokenOptimization.betas = [...(tokenOptimization.betas || []), 'context-1m-2025-08-07'];
+      // Remove duplicates
+      tokenOptimization.betas = [...new Set(tokenOptimization.betas)];
+    }
+  }
+
   const resolved: ResolvedConfig = {
     workingDirectory,
     permissionMode,
@@ -341,6 +388,8 @@ export async function resolveConfig(): Promise<ResolvedConfig> {
     allowedTools: claudeConfig.allowedTools,
     env: claudeConfig.env,
     settingSources,
+    agents: claudeConfig.agents,
+    tokenOptimization,
   };
 
   // Log configuration summary
@@ -371,6 +420,34 @@ export async function resolveConfig(): Promise<ResolvedConfig> {
     logger.info(`  Commands: ${Object.keys(resolved.commands).join(', ')}`);
   } else {
     logger.info('  Commands: none');
+  }
+
+  if (resolved.agents && Object.keys(resolved.agents).length > 0) {
+    logger.info(`  Subagents: ${Object.keys(resolved.agents).join(', ')}`);
+  } else {
+    logger.info('  Subagents: none');
+  }
+
+  if (resolved.tokenOptimization) {
+    logger.info('  Token optimization:');
+    if (resolved.tokenOptimization.enableExtendedContext) {
+      logger.info('    ✓ Extended context enabled (1M tokens)');
+    }
+    if (resolved.tokenOptimization.betas && resolved.tokenOptimization.betas.length > 0) {
+      logger.info(`    Beta features: ${resolved.tokenOptimization.betas.join(', ')}`);
+    }
+    if (resolved.tokenOptimization.maxBudgetUsd !== undefined) {
+      logger.info(`    Max budget: $${resolved.tokenOptimization.maxBudgetUsd}`);
+    }
+    if (resolved.tokenOptimization.maxThinkingTokens !== undefined) {
+      logger.info(`    Max thinking tokens: ${resolved.tokenOptimization.maxThinkingTokens}`);
+    }
+    if (resolved.tokenOptimization.maxTurns !== undefined) {
+      logger.info(`    Max turns: ${resolved.tokenOptimization.maxTurns}`);
+    }
+    if (resolved.tokenOptimization.maxMessageHistory !== undefined) {
+      logger.info(`    Max message history: ${resolved.tokenOptimization.maxMessageHistory}`);
+    }
   }
 
   return resolved;

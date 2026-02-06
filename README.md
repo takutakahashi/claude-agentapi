@@ -15,6 +15,11 @@ This project implements a server compatible with the [coder/agentapi](https://gi
 - ✅ **Claude Code compatible configuration** (`.claude/config.json`)
 - ✅ **MCP (Model Context Protocol) servers support**
 - ✅ **Plugin marketplace support**
+- ✅ **Token optimization features**
+  - 🚀 Subagents support for specialized tasks
+  - 🚀 Extended context window (1M tokens) via beta features
+  - 🚀 Budget limits and conversation turn limits
+  - 🚀 Configurable message history management
 - ✅ **Prometheus metrics export** (Claude Code compatible)
 - ✅ Server-Sent Events (SSE) for real-time updates
 - ✅ Multi-turn conversation support
@@ -118,7 +123,9 @@ This server uses the Claude Agent SDK v1 API (`query` function) which supports M
   - Automatically resolves plugin paths from marketplaces
   - Supports custom marketplaces via `extraKnownMarketplaces`
   - Example: `"code-simplifier@claude-plugins-official": true`
-- ⏳ `commands` - Custom command configurations (not yet implemented)
+- ✅ `commands` - Custom command configurations
+- ✅ `agents` - Subagent definitions for specialized tasks
+- ✅ `tokenOptimization` - Token efficiency and budget settings
 
 #### Example `.claude/config.json`
 
@@ -162,6 +169,52 @@ See `.claude/config.json.example` for a complete example with all supported opti
   - `env`: Environment variables for the command process
   - `description`: Description of what the command does
 
+- **`agents`**: Subagent definitions for specialized tasks
+  - `description`: What this agent does
+  - `prompt`: System prompt for the agent
+  - `tools`: Array of tool names the agent can use
+  - `model`: Model to use (`sonnet`, `opus`, `haiku`, or `inherit`)
+  - Example use cases:
+    - Code review specialist with read-only access
+    - Fast exploration agent using Haiku model
+    - Security audit agent with specific tools
+
+- **`tokenOptimization`**: Token efficiency and cost management
+  - `enableExtendedContext`: Enable 1M token context window (boolean)
+  - `betas`: Array of beta features to enable (e.g., `["context-1m-2025-08-07"]`)
+  - `maxBudgetUsd`: Maximum USD budget for the session (number)
+  - `maxThinkingTokens`: Limit on internal reasoning tokens (number)
+  - `maxTurns`: Maximum conversation turns (number)
+  - `maxMessageHistory`: Maximum messages to keep in history (number)
+
+#### Token Optimization Example
+
+```json
+{
+  "agents": {
+    "code-reviewer": {
+      "description": "Expert code review specialist",
+      "prompt": "Focus on security vulnerabilities and performance issues.",
+      "tools": ["Read", "Grep", "Glob"],
+      "model": "sonnet"
+    },
+    "explorer": {
+      "description": "Fast codebase exploration",
+      "prompt": "Quickly find and summarize relevant code.",
+      "tools": ["Read", "Grep", "Glob"],
+      "model": "haiku"
+    }
+  },
+  "tokenOptimization": {
+    "enableExtendedContext": true,
+    "maxBudgetUsd": 10.0,
+    "maxThinkingTokens": 10000,
+    "maxTurns": 50,
+    "maxMessageHistory": 10000
+  }
+}
+```
+
 ### Environment Variables
 
 Create a `.env` file based on `.env.example`:
@@ -199,9 +252,17 @@ Use either API Key or OAuth Token (not both):
 - `CLAUDE_CODE_ENABLE_TELEMETRY` - Enable OpenTelemetry metrics export (set to `1` to enable)
 - `PROMETHEUS_PORT` - Prometheus metrics server port (default: 9464)
 
+#### Token Optimization Configuration
+- `CLAUDE_ENABLE_EXTENDED_CONTEXT` - Enable 1M token context window (set to `true` to enable)
+- `CLAUDE_MAX_BUDGET_USD` - Maximum USD budget for the session (e.g., `10.0`)
+- `CLAUDE_MAX_THINKING_TOKENS` - Maximum thinking tokens limit (e.g., `10000`)
+- `CLAUDE_MAX_TURNS` - Maximum conversation turns (e.g., `50`)
+- `MAX_MESSAGE_HISTORY` - Maximum messages to keep in history (default: 100000)
+
+**Note**: Environment variables override corresponding settings in `.claude/config.json`.
+
 #### Other Configuration
 - `DEBUG` - Enable debug logging (default: false)
-- `MAX_MESSAGE_HISTORY` - Maximum messages to keep in history (default: 100)
 
 ## Usage
 

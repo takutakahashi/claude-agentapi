@@ -6,7 +6,7 @@ import { logger } from '../utils/logger.js';
 import { resolveConfig } from '../utils/config.js';
 import { getMetricsService } from './metrics.js';
 
-const MAX_MESSAGE_HISTORY = parseInt(process.env.MAX_MESSAGE_HISTORY || '100000', 10);
+const DEFAULT_MAX_MESSAGE_HISTORY = parseInt(process.env.MAX_MESSAGE_HISTORY || '100000', 10);
 
 // Helper class to manage streaming input
 class InputStreamManager {
@@ -49,6 +49,7 @@ export class AgentService {
   private pendingPlanToolUseId: string | null = null;
   private pendingPlanInput: unknown | null = null;
   private pendingPlanResolve: ((value: boolean) => void) | null = null;
+  private maxMessageHistory: number = DEFAULT_MAX_MESSAGE_HISTORY;
 
   async initialize(): Promise<void> {
     try {
@@ -103,6 +104,47 @@ export class AgentService {
       if (config.settingSources && config.settingSources.length > 0) {
         logger.info(`Configuring setting sources: ${config.settingSources.join(', ')}...`);
         queryOptions.options!.settingSources = config.settingSources;
+      }
+
+      // Add subagents if configured
+      if (config.agents && Object.keys(config.agents).length > 0) {
+        logger.info(`Configuring ${Object.keys(config.agents).length} subagent(s)...`);
+        queryOptions.options!.agents = config.agents;
+      }
+
+      // Add token optimization settings if configured
+      if (config.tokenOptimization) {
+        const opts = config.tokenOptimization;
+
+        // Add beta features for extended context
+        if (opts.betas && opts.betas.length > 0) {
+          logger.info(`Enabling beta features: ${opts.betas.join(', ')}`);
+          queryOptions.options!.betas = opts.betas as ('context-1m-2025-08-07')[];
+        }
+
+        // Add budget limit
+        if (opts.maxBudgetUsd !== undefined) {
+          logger.info(`Setting max budget: $${opts.maxBudgetUsd}`);
+          queryOptions.options!.maxBudgetUsd = opts.maxBudgetUsd;
+        }
+
+        // Add thinking tokens limit
+        if (opts.maxThinkingTokens !== undefined) {
+          logger.info(`Setting max thinking tokens: ${opts.maxThinkingTokens}`);
+          queryOptions.options!.maxThinkingTokens = opts.maxThinkingTokens;
+        }
+
+        // Add conversation turns limit
+        if (opts.maxTurns !== undefined) {
+          logger.info(`Setting max turns: ${opts.maxTurns}`);
+          queryOptions.options!.maxTurns = opts.maxTurns;
+        }
+
+        // Set max message history
+        if (opts.maxMessageHistory !== undefined) {
+          this.maxMessageHistory = opts.maxMessageHistory;
+          logger.info(`Setting max message history: ${this.maxMessageHistory}`);
+        }
       }
 
       // Add canUseTool callback to handle AskUserQuestion and ExitPlanMode without timeout
@@ -978,9 +1020,9 @@ export class AgentService {
     this.messages.push(message);
 
     // Trim message history if it exceeds the limit
-    if (this.messages.length > MAX_MESSAGE_HISTORY) {
-      this.messages = this.messages.slice(-MAX_MESSAGE_HISTORY);
-      logger.debug(`Message history trimmed to ${MAX_MESSAGE_HISTORY} messages`);
+    if (this.messages.length > this.maxMessageHistory) {
+      this.messages = this.messages.slice(-this.maxMessageHistory);
+      logger.debug(`Message history trimmed to ${this.maxMessageHistory} messages`);
     }
 
     return message;
