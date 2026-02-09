@@ -46,6 +46,8 @@ HOST=localhost
 CLAUDE_CODE_USE_BEDROCK=0
 ANTHROPIC_MODEL=default
 ANTHROPIC_OAUTH_TOKEN=your_oauth_token_here
+# If using AWS Bedrock (CLAUDE_CODE_USE_BEDROCK=1), also add:
+# CLAUDE_CODE_ATTRIBUTION_HEADER=0
 EOF
 
 # Configure npm to use GitHub Packages
@@ -69,6 +71,8 @@ HOST=localhost
 CLAUDE_CODE_USE_BEDROCK=0
 ANTHROPIC_MODEL=default
 ANTHROPIC_OAUTH_TOKEN=your_oauth_token_here
+# If using AWS Bedrock (CLAUDE_CODE_USE_BEDROCK=1), also add:
+# CLAUDE_CODE_ATTRIBUTION_HEADER=0
 EOF
 
 # Run with npx (npm)
@@ -179,6 +183,7 @@ Create a `.env` file based on `.env.example`:
 - `AWS_ACCESS_KEY_ID` - AWS access key
 - `AWS_SECRET_ACCESS_KEY` - AWS secret key
 - `AWS_SESSION_TOKEN` - AWS session token (optional)
+- `CLAUDE_CODE_ATTRIBUTION_HEADER=0` - **Required for AWS Bedrock** - Disables the attribution header to avoid `x-anthropic-billing-header` validation error
 
 #### Anthropic API Configuration (when not using Bedrock)
 Use either API Key or OAuth Token (not both):
@@ -804,6 +809,36 @@ The project follows a modular architecture with clear separation of concerns:
 2. Implement logic in `src/services/`
 3. Create route handlers in `src/routes/`
 4. Register routes in `src/server.ts`
+
+## Troubleshooting
+
+### AWS Bedrock: x-anthropic-billing-header error
+
+**Problem:**
+```
+API Error: 400 x-anthropic-billing-header is a reserved keyword and may not be used in the system prompt.
+```
+
+**Cause:**
+The Claude Agent SDK includes an attribution header in system prompts by default. However, `x-anthropic-billing-header` is a reserved keyword in AWS Bedrock and cannot be used in system prompts.
+
+**Solution:**
+Set the following environment variable to disable the attribution header:
+
+```bash
+CLAUDE_CODE_ATTRIBUTION_HEADER=0
+```
+
+Add this to your `.env` file:
+```bash
+# Required for AWS Bedrock
+CLAUDE_CODE_ATTRIBUTION_HEADER=0
+```
+
+This configuration is already included in the `.env.example` file.
+
+**Reference:**
+- GitHub Issue: [musistudio/claude-code-router#1161](https://github.com/musistudio/claude-code-router/issues/1161)
 
 ## License
 
