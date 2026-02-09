@@ -309,6 +309,37 @@ Get current agent status.
 ### GET /messages
 Get conversation message history (user and assistant messages only).
 
+**Query Parameters:**
+
+Pagination options (all optional):
+
+1. **Limit and Direction** - Get first/last n messages:
+   - `limit` (number): Number of messages to retrieve
+   - `direction` (string): `head` (first n) or `tail` (last n, default)
+
+2. **Around a Message** - Get messages around a specific message ID:
+   - `around` (number): Message ID to center around
+   - `context` (number): Number of messages before/after (default: 10)
+
+**Examples:**
+
+```bash
+# Get all messages (no pagination)
+GET /messages
+
+# Get last 10 messages (most recent)
+GET /messages?limit=10
+
+# Get first 5 messages
+GET /messages?limit=5&direction=head
+
+# Get 3 messages before and after message ID 42
+GET /messages?around=42&context=3
+
+# Get 10 messages before and after message ID 100 (default context)
+GET /messages?around=100
+```
+
 **Response:**
 ```json
 {
@@ -320,9 +351,23 @@ Get conversation message history (user and assistant messages only).
       "time": "2024-01-01T00:00:00.000Z",
       "type": "normal" | "question" | "plan"
     }
-  ]
+  ],
+  "total": 100,
+  "hasMore": true
 }
 ```
+
+**Response Fields:**
+- `messages`: Array of message objects
+- `total`: Total number of messages available
+- `hasMore`: Whether there are more messages beyond the returned set
+
+**Parameter Validation:**
+- `limit` must be a positive integer
+- `direction` must be either `head` or `tail`
+- `around` must be a non-negative integer
+- `context` requires `around` to be specified
+- `around` cannot be used with `limit` or `direction`
 
 ### GET /tool_status
 Get currently active tool executions. When a tool starts executing, it appears in this list. When the tool completes (success or error), it is removed from the list.

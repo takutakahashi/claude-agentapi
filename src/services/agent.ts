@@ -1012,6 +1012,66 @@ export class AgentService {
     return [...this.messages];
   }
 
+  /**
+   * Get messages with pagination/filtering options
+   * @param options Pagination options
+   * @returns Filtered messages and metadata
+   */
+  getMessagesWithPagination(options: {
+    limit?: number;
+    direction?: 'head' | 'tail';
+    around?: number;
+    context?: number;
+  }): {
+    messages: Message[];
+    total: number;
+    hasMore: boolean;
+  } {
+    const total = this.messages.length;
+    let messages: Message[];
+    let hasMore = false;
+
+    // Case 1: Get messages around a specific ID
+    if (options.around !== undefined) {
+      const targetIndex = this.messages.findIndex(m => m.id === options.around);
+
+      if (targetIndex === -1) {
+        // ID not found, return empty
+        return { messages: [], total, hasMore: false };
+      }
+
+      const contextCount = options.context ?? 10; // Default to 10 messages before/after
+      const startIndex = Math.max(0, targetIndex - contextCount);
+      const endIndex = Math.min(total, targetIndex + contextCount + 1);
+
+      messages = this.messages.slice(startIndex, endIndex);
+      hasMore = startIndex > 0 || endIndex < total;
+    }
+    // Case 2: Get first/last n messages
+    else if (options.limit !== undefined) {
+      const limit = options.limit;
+      const direction = options.direction ?? 'tail'; // Default to tail (most recent)
+
+      if (direction === 'head') {
+        // Get first n messages
+        messages = this.messages.slice(0, limit);
+        hasMore = total > limit;
+      } else {
+        // Get last n messages (most recent)
+        const startIndex = Math.max(0, total - limit);
+        messages = this.messages.slice(startIndex);
+        hasMore = startIndex > 0;
+      }
+    }
+    // Case 3: Get all messages (no pagination)
+    else {
+      messages = [...this.messages];
+      hasMore = false;
+    }
+
+    return { messages, total, hasMore };
+  }
+
   getActiveToolExecutions(): Message[] {
     return [...this.activeToolExecutions];
   }

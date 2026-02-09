@@ -60,7 +60,51 @@
     "/messages": {
       "get": {
         "summary": "Get conversation messages",
-        "description": "Returns only user and assistant messages (pure conversation without tool execution information)",
+        "description": "Returns only user and assistant messages (pure conversation without tool execution information). Supports pagination via query parameters.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of messages to retrieve",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "description": "Direction for limit-based pagination. 'head' returns first n messages, 'tail' returns last n messages (most recent)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["head", "tail"],
+              "default": "tail"
+            }
+          },
+          {
+            "name": "around",
+            "in": "query",
+            "description": "Message ID to center around. Returns messages before and after this ID. Cannot be used with 'limit' or 'direction'.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "context",
+            "in": "query",
+            "description": "Number of messages to return before and after the 'around' message. Requires 'around' parameter.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 10
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Messages retrieved successfully",
@@ -68,6 +112,82 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MessagesResponseBody"
+                },
+                "examples": {
+                  "all_messages": {
+                    "summary": "Get all messages",
+                    "value": {
+                      "$schema": "https://10.42.2.198:9000/schemas/MessagesResponseBody.json",
+                      "messages": [
+                        {
+                          "id": 0,
+                          "role": "user",
+                          "content": "Hello",
+                          "time": "2024-01-01T00:00:00.000Z",
+                          "type": "normal"
+                        }
+                      ],
+                      "total": 100,
+                      "hasMore": false
+                    }
+                  },
+                  "last_10": {
+                    "summary": "Get last 10 messages (most recent)",
+                    "value": {
+                      "$schema": "https://10.42.2.198:9000/schemas/MessagesResponseBody.json",
+                      "messages": [],
+                      "total": 100,
+                      "hasMore": true
+                    }
+                  },
+                  "around_message": {
+                    "summary": "Get messages around ID 42",
+                    "value": {
+                      "$schema": "https://10.42.2.198:9000/schemas/MessagesResponseBody.json",
+                      "messages": [],
+                      "total": 100,
+                      "hasMore": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemJson"
+                },
+                "examples": {
+                  "invalid_limit": {
+                    "summary": "Invalid limit parameter",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Invalid query parameters",
+                      "status": 400,
+                      "detail": "limit: Expected number, received nan"
+                    }
+                  },
+                  "context_without_around": {
+                    "summary": "Context requires around",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Invalid query parameters",
+                      "status": 400,
+                      "detail": "Parameter \"context\" requires \"around\" to be specified"
+                    }
+                  },
+                  "around_with_limit": {
+                    "summary": "Around cannot be used with limit",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Invalid query parameters",
+                      "status": 400,
+                      "detail": "Parameter \"around\" cannot be used with \"limit\" or \"direction\""
+                    }
+                  }
                 }
               }
             }
@@ -376,6 +496,14 @@
               "$ref": "#/components/schemas/Message"
             },
             "description": "Array of user and assistant messages only"
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total number of messages available in the conversation"
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "Whether there are more messages beyond the returned set"
           }
         }
       },
