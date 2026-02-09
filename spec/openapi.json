@@ -103,6 +103,26 @@
               "minimum": 0,
               "default": 10
             }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Cursor-based pagination: Get messages after this message ID. Returns messages with ID > after. Cannot be used with 'before', 'around', 'context', or 'direction'.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "description": "Cursor-based pagination: Get messages before this message ID. Returns messages with ID < before. Cannot be used with 'after', 'around', 'context', or 'direction'.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
           }
         ],
         "responses": {
@@ -148,6 +168,24 @@
                       "total": 100,
                       "hasMore": true
                     }
+                  },
+                  "after_cursor": {
+                    "summary": "Get messages after ID 100 (cursor-based pagination)",
+                    "value": {
+                      "$schema": "https://10.42.2.198:9000/schemas/MessagesResponseBody.json",
+                      "messages": [],
+                      "total": 100,
+                      "hasMore": true
+                    }
+                  },
+                  "before_cursor": {
+                    "summary": "Get messages before ID 50 (cursor-based pagination)",
+                    "value": {
+                      "$schema": "https://10.42.2.198:9000/schemas/MessagesResponseBody.json",
+                      "messages": [],
+                      "total": 100,
+                      "hasMore": true
+                    }
                   }
                 }
               }
@@ -186,6 +224,24 @@
                       "title": "Invalid query parameters",
                       "status": 400,
                       "detail": "Parameter \"around\" cannot be used with \"limit\" or \"direction\""
+                    }
+                  },
+                  "after_with_before": {
+                    "summary": "After and before are mutually exclusive",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Invalid query parameters",
+                      "status": 400,
+                      "detail": "Parameters \"after\" and \"before\" cannot be used together"
+                    }
+                  },
+                  "after_with_around": {
+                    "summary": "After cannot be used with around-based pagination",
+                    "value": {
+                      "type": "about:blank",
+                      "title": "Invalid query parameters",
+                      "status": 400,
+                      "detail": "Parameter \"after\" cannot be used with \"around\", \"context\", or \"direction\""
                     }
                   }
                 }
