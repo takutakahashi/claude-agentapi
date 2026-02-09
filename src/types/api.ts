@@ -17,9 +17,24 @@ export const MessageSchema = z.object({
 
 export type Message = z.infer<typeof MessageSchema>;
 
+export const MessagesQueryParamsSchema = z.object({
+  // Get first/last n messages
+  limit: z.coerce.number().int().positive().optional(),
+  // 'head' for first n messages, 'tail' for last n messages (default: 'tail')
+  direction: z.enum(['head', 'tail']).optional(),
+  // Get messages around a specific message ID
+  around: z.coerce.number().int().nonnegative().optional(),
+  // Number of messages before/after the 'around' message (requires 'around')
+  context: z.coerce.number().int().nonnegative().optional(),
+});
+
+export type MessagesQueryParams = z.infer<typeof MessagesQueryParamsSchema>;
+
 export const MessagesResponseBodySchema = z.object({
   $schema: z.string().optional(),
   messages: z.array(MessageSchema),
+  total: z.number().optional(), // Total number of messages available
+  hasMore: z.boolean().optional(), // Whether there are more messages available
 });
 
 export type MessagesResponseBody = z.infer<typeof MessagesResponseBodySchema>;
