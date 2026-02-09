@@ -1067,7 +1067,8 @@ export class AgentService {
 
         messages = this.messages.slice(startIndex, endIndex);
         hasMore = endIndex < total; // More messages exist after endIndex
-      } else if (options.before !== undefined) {
+      } else {
+        // options.before !== undefined
         // Get messages with ID < before (excluding before itself)
         const beforeIndex = this.messages.findIndex(m => m.id === options.before);
 
