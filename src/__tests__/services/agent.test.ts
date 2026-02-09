@@ -208,6 +208,116 @@ describe('AgentService', () => {
       });
     });
 
+    describe('Cursor-based pagination (after/before)', () => {
+      describe('after parameter', () => {
+        it('should return messages with ID > after', () => {
+          const result = service.getMessagesWithPagination({ after: 10 });
+
+          expect(result.messages).toHaveLength(9); // IDs 11-19
+          expect(result.messages[0].id).toBe(11);
+          expect(result.messages[8].id).toBe(19);
+          expect(result.total).toBe(20);
+          expect(result.hasMore).toBe(false); // No more messages after 19
+        });
+
+        it('should exclude the cursor message itself', () => {
+          const result = service.getMessagesWithPagination({ after: 10 });
+
+          expect(result.messages.every(m => m.id !== 10)).toBe(true);
+          expect(result.messages[0].id).toBe(11); // First message is after 10
+        });
+
+        it('should work with limit parameter', () => {
+          const result = service.getMessagesWithPagination({ after: 5, limit: 3 });
+
+          expect(result.messages).toHaveLength(3); // IDs 6, 7, 8
+          expect(result.messages[0].id).toBe(6);
+          expect(result.messages[2].id).toBe(8);
+          expect(result.total).toBe(20);
+          expect(result.hasMore).toBe(true); // More messages exist after 8
+        });
+
+        it('should handle after at the end', () => {
+          const result = service.getMessagesWithPagination({ after: 19 });
+
+          expect(result.messages).toHaveLength(0); // No messages after last one
+          expect(result.total).toBe(20);
+          expect(result.hasMore).toBe(false);
+        });
+
+        it('should return empty when ID not found', () => {
+          const result = service.getMessagesWithPagination({ after: 999 });
+
+          expect(result.messages).toHaveLength(0);
+          expect(result.total).toBe(20);
+          expect(result.hasMore).toBe(false);
+        });
+
+        it('should handle after=0 (first message)', () => {
+          const result = service.getMessagesWithPagination({ after: 0 });
+
+          expect(result.messages).toHaveLength(19); // IDs 1-19
+          expect(result.messages[0].id).toBe(1);
+          expect(result.messages[18].id).toBe(19);
+          expect(result.hasMore).toBe(false);
+        });
+      });
+
+      describe('before parameter', () => {
+        it('should return messages with ID < before', () => {
+          const result = service.getMessagesWithPagination({ before: 10 });
+
+          expect(result.messages).toHaveLength(10); // IDs 0-9
+          expect(result.messages[0].id).toBe(0);
+          expect(result.messages[9].id).toBe(9);
+          expect(result.total).toBe(20);
+          expect(result.hasMore).toBe(false); // No more messages before 0
+        });
+
+        it('should exclude the cursor message itself', () => {
+          const result = service.getMessagesWithPagination({ before: 10 });
+
+          expect(result.messages.every(m => m.id !== 10)).toBe(true);
+          expect(result.messages[result.messages.length - 1].id).toBe(9);
+        });
+
+        it('should work with limit parameter', () => {
+          const result = service.getMessagesWithPagination({ before: 10, limit: 3 });
+
+          expect(result.messages).toHaveLength(3); // IDs 7, 8, 9
+          expect(result.messages[0].id).toBe(7);
+          expect(result.messages[2].id).toBe(9);
+          expect(result.total).toBe(20);
+          expect(result.hasMore).toBe(true); // More messages exist before 7
+        });
+
+        it('should handle before at the start', () => {
+          const result = service.getMessagesWithPagination({ before: 0 });
+
+          expect(result.messages).toHaveLength(0); // No messages before first one
+          expect(result.total).toBe(20);
+          expect(result.hasMore).toBe(false);
+        });
+
+        it('should return empty when ID not found', () => {
+          const result = service.getMessagesWithPagination({ before: 999 });
+
+          expect(result.messages).toHaveLength(0);
+          expect(result.total).toBe(20);
+          expect(result.hasMore).toBe(false);
+        });
+
+        it('should handle before=19 (last message)', () => {
+          const result = service.getMessagesWithPagination({ before: 19 });
+
+          expect(result.messages).toHaveLength(19); // IDs 0-18
+          expect(result.messages[0].id).toBe(0);
+          expect(result.messages[18].id).toBe(18);
+          expect(result.hasMore).toBe(false);
+        });
+      });
+    });
+
     describe('Edge cases', () => {
       it('should handle empty message list', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -26,6 +26,10 @@ export const MessagesQueryParamsSchema = z.object({
   around: z.coerce.number().int().nonnegative().optional(),
   // Number of messages before/after the 'around' message (requires 'around')
   context: z.coerce.number().int().nonnegative().optional(),
+  // Cursor-based pagination: Get messages with ID > after (excluding after itself)
+  after: z.coerce.number().int().nonnegative().optional(),
+  // Cursor-based pagination: Get messages with ID < before (excluding before itself)
+  before: z.coerce.number().int().nonnegative().optional(),
 });
 
 export type MessagesQueryParams = z.infer<typeof MessagesQueryParamsSchema>;

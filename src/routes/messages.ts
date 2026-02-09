@@ -26,6 +26,38 @@ router.get('/messages', (req, res) => {
     const params = parseResult.data;
 
     // Validate parameter combinations
+    // Check cursor-based pagination first (before checking context)
+    if (params.after !== undefined && params.before !== undefined) {
+      return res.status(400).json({
+        type: 'about:blank',
+        title: 'Invalid query parameters',
+        status: 400,
+        detail: 'Parameters "after" and "before" cannot be used together',
+      });
+    }
+
+    if (
+      (params.after !== undefined || params.before !== undefined) &&
+      (params.around !== undefined || params.context !== undefined)
+    ) {
+      return res.status(400).json({
+        type: 'about:blank',
+        title: 'Invalid query parameters',
+        status: 400,
+        detail: 'Parameters "after"/"before" cannot be used with "around"/"context"',
+      });
+    }
+
+    if ((params.after !== undefined || params.before !== undefined) && params.direction !== undefined) {
+      return res.status(400).json({
+        type: 'about:blank',
+        title: 'Invalid query parameters',
+        status: 400,
+        detail: 'Parameters "after"/"before" cannot be used with "direction"',
+      });
+    }
+
+    // Check around/context parameters
     if (params.context !== undefined && params.around === undefined) {
       return res.status(400).json({
         type: 'about:blank',
@@ -50,6 +82,8 @@ router.get('/messages', (req, res) => {
       direction: params.direction,
       around: params.around,
       context: params.context,
+      after: params.after,
+      before: params.before,
     });
 
     const response: MessagesResponseBody = {

@@ -240,4 +240,124 @@ describe('GET /messages', () => {
       expect(response.body.title).toBe('Invalid query parameters');
     });
   });
+
+  describe('Cursor-based pagination validation', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should return error when after and before are both specified', async () => {
+      const response = await request(app).get('/messages?after=5&before=10');
+
+      expect(response.status).toBe(400);
+      expect(response.body.title).toBe('Invalid query parameters');
+      expect(response.body.detail).toContain('after');
+      expect(response.body.detail).toContain('before');
+    });
+
+    it('should return error when after is used with around', async () => {
+      const response = await request(app).get('/messages?after=5&around=10');
+
+      expect(response.status).toBe(400);
+      expect(response.body.title).toBe('Invalid query parameters');
+      expect(response.body.detail).toContain('after');
+      expect(response.body.detail).toContain('around');
+    });
+
+    it('should return error when before is used with context', async () => {
+      const response = await request(app).get('/messages?before=5&context=10');
+
+      expect(response.status).toBe(400);
+      expect(response.body.title).toBe('Invalid query parameters');
+      expect(response.body.detail).toContain('before');
+      expect(response.body.detail).toContain('context');
+    });
+
+    it('should return error when after is used with direction', async () => {
+      const response = await request(app).get('/messages?after=5&direction=head');
+
+      expect(response.status).toBe(400);
+      expect(response.body.title).toBe('Invalid query parameters');
+      expect(response.body.detail).toContain('after');
+      expect(response.body.detail).toContain('direction');
+    });
+
+    it('should allow after with limit', async () => {
+      (agentService.getMessagesWithPagination as ReturnType<typeof vi.fn>).mockReturnValue({
+        messages: [],
+        total: 0,
+        hasMore: false,
+      });
+
+      const response = await request(app).get('/messages?after=5&limit=10');
+
+      expect(response.status).toBe(200);
+    });
+
+    it('should return error for negative after parameter', async () => {
+      const response = await request(app).get('/messages?after=-5');
+
+      expect(response.status).toBe(400);
+      expect(response.body.title).toBe('Invalid query parameters');
+    });
+
+    it('should return error for invalid after parameter', async () => {
+      const response = await request(app).get('/messages?after=invalid');
+
+      expect(response.status).toBe(400);
+      expect(response.body.title).toBe('Invalid query parameters');
+    });
+  });
+
+  describe('Cursor-based pagination integration', () => {
+    const createMockMessages = (count: number): Message[] =>
+      Array.from({ length: count }, (_, i) => ({
+        id: i,
+        role: i % 2 === 0 ? ('user' as const) : ('assistant' as const),
+        content: `Message ${i}`,
+        time: new Date(Date.UTC(2024, 0, 1, 0, 0, i)).toISOString(),
+      }));
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should return messages after a specific ID', async () => {
+      const allMessages = createMockMessages(20);
+      const expectedMessages = allMessages.slice(11); // IDs 11-19
+
+      (agentService.getMessagesWithPagination as ReturnType<typeof vi.fn>).mockReturnValue({
+        messages: expectedMessages,
+        total: 20,
+        hasMore: false,
+      });
+
+      const response = await request(app).get('/messages?after=10');
+
+      expect(response.status).toBe(200);
+      expect(response.body.messages).toHaveLength(9);
+      expect(response.body.messages[0].id).toBe(11);
+      expect(response.body.total).toBe(20);
+      expect(response.body.hasMore).toBe(false);
+    });
+
+    it('should return messages before a specific ID with limit', async () => {
+      const allMessages = createMockMessages(20);
+      const expectedMessages = allMessages.slice(7, 10); // IDs 7, 8, 9
+
+      (agentService.getMessagesWithPagination as ReturnType<typeof vi.fn>).mockReturnValue({
+        messages: expectedMessages,
+        total: 20,
+        hasMore: true,
+      });
+
+      const response = await request(app).get('/messages?before=10&limit=3');
+
+      expect(response.status).toBe(200);
+      expect(response.body.messages).toHaveLength(3);
+      expect(response.body.messages[0].id).toBe(7);
+      expect(response.body.messages[2].id).toBe(9);
+      expect(response.body.hasMore).toBe(true);
+    });
+  });
 });
