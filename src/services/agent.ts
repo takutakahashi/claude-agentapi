@@ -1022,6 +1022,8 @@ export class AgentService {
     direction?: 'head' | 'tail';
     around?: number;
     context?: number;
+    after?: number;
+    before?: number;
   }): {
     messages: Message[];
     total: number;
@@ -1047,7 +1049,43 @@ export class AgentService {
       messages = this.messages.slice(startIndex, endIndex);
       hasMore = startIndex > 0 || endIndex < total;
     }
-    // Case 2: Get first/last n messages
+    // Case 2: Cursor-based pagination (after/before) - check before limit to avoid conflict
+    else if (options.after !== undefined || options.before !== undefined) {
+      if (options.after !== undefined) {
+        // Get messages with ID > after (excluding after itself)
+        const afterIndex = this.messages.findIndex(m => m.id === options.after);
+
+        if (afterIndex === -1) {
+          // ID not found - return empty for safety
+          return { messages: [], total, hasMore: false };
+        }
+
+        // Start from next message after the cursor
+        const startIndex = afterIndex + 1;
+        const limit = options.limit ?? total; // If no limit, get all remaining
+        const endIndex = Math.min(total, startIndex + limit);
+
+        messages = this.messages.slice(startIndex, endIndex);
+        hasMore = endIndex < total; // More messages exist after endIndex
+      } else if (options.before !== undefined) {
+        // Get messages with ID < before (excluding before itself)
+        const beforeIndex = this.messages.findIndex(m => m.id === options.before);
+
+        if (beforeIndex === -1) {
+          // ID not found - return empty for safety
+          return { messages: [], total, hasMore: false };
+        }
+
+        // Get messages before the cursor
+        const limit = options.limit ?? beforeIndex; // If no limit, get all preceding
+        const startIndex = Math.max(0, beforeIndex - limit);
+        const endIndex = beforeIndex; // Exclude the before message itself
+
+        messages = this.messages.slice(startIndex, endIndex);
+        hasMore = startIndex > 0; // More messages exist before startIndex
+      }
+    }
+    // Case 3: Get first/last n messages
     else if (options.limit !== undefined) {
       const limit = options.limit;
       const direction = options.direction ?? 'tail'; // Default to tail (most recent)
@@ -1063,7 +1101,7 @@ export class AgentService {
         hasMore = startIndex > 0;
       }
     }
-    // Case 3: Get all messages (no pagination)
+    // Case 4: Get all messages (no pagination)
     else {
       messages = [...this.messages];
       hasMore = false;
