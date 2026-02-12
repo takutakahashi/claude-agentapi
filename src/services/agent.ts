@@ -1192,7 +1192,7 @@ export class AgentService {
     if (this.outputFileStream) {
       try {
         await new Promise<void>((resolve, reject) => {
-          this.outputFileStream!.end((error) => {
+          this.outputFileStream!.end((error?: Error | null) => {
             if (error) {
               logger.error('Error closing output file stream:', error);
               reject(error);
