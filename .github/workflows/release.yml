@@ -37,8 +37,15 @@ jobs:
       - name: Update package.json version from tag
         run: |
           VERSION=${GITHUB_REF_NAME#v}
-          echo "Updating package.json version to $VERSION"
-          npm version $VERSION --no-git-tag-version
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "Current version: $CURRENT_VERSION"
+          echo "Target version: $VERSION"
+          if [ "$CURRENT_VERSION" != "$VERSION" ]; then
+            echo "Updating package.json version to $VERSION"
+            npm version $VERSION --no-git-tag-version
+          else
+            echo "Version is already $VERSION, skipping update"
+          fi
 
       - name: Build project
         run: bun run build
