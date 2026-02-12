@@ -203,6 +203,7 @@ Use either API Key or OAuth Token (not both):
 #### Other Configuration
 - `DEBUG` - Enable debug logging (default: false)
 - `MAX_MESSAGE_HISTORY` - Maximum messages to keep in history (default: 100)
+- `STREAM_JSON_OUTPUT_FILE` - Path to write stream JSON output (for debugging and logging)
 
 ## Usage
 
@@ -274,11 +275,19 @@ npx claude-agentapi --permission-mode acceptEdits
 npx claude-agentapi -p acceptEdits
 ```
 
+#### `--output-file <path>`
+Writes the stream JSON output from the agent to the specified file. This is useful for debugging and logging purposes. Each SDK message will be written as a separate JSON line.
+
+```bash
+npx claude-agentapi --output-file /path/to/output.jsonl
+```
+
 **Example with multiple options:**
 ```bash
 npx claude-agentapi \
   --working-directory /path/to/project \
-  --permission-mode acceptEdits
+  --permission-mode acceptEdits \
+  --output-file /tmp/agent-stream.jsonl
 ```
 
 ## API Endpoints

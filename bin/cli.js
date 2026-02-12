@@ -15,6 +15,7 @@ Options:
   -w, --working-directory <path>     Set the working directory for the agent
   -p, --permission-mode <mode>       Set permission mode (default|acceptEdits|bypassPermissions)
   --mcp-config <json|path>           MCP servers configuration (JSON string or file path)
+  --output-file <path>               Write stream JSON output to specified file
   --dangerously-skip-permissions     Bypass all permission checks (use with caution!)
 
 Environment Variables:
@@ -72,6 +73,12 @@ if (permissionModeIndex !== -1 && args[permissionModeIndex + 1]) {
 const mcpConfigIndex = args.findIndex(arg => arg === '--mcp-config');
 if (mcpConfigIndex !== -1 && args[mcpConfigIndex + 1]) {
   process.env.CLAUDE_MCP_CONFIG = args[mcpConfigIndex + 1];
+}
+
+// Check for --output-file option
+const outputFileIndex = args.findIndex(arg => arg === '--output-file');
+if (outputFileIndex !== -1 && args[outputFileIndex + 1]) {
+  process.env.STREAM_JSON_OUTPUT_FILE = args[outputFileIndex + 1];
 }
 
 // Import and run the main application
