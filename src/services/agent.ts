@@ -5,6 +5,9 @@ import { sessionService } from './session.js';
 import { logger } from '../utils/logger.js';
 import { resolveConfig } from '../utils/config.js';
 import { getMetricsService } from './metrics.js';
+import { createWriteStream, type WriteStream } from 'fs';
+import { dirname } from 'path';
+import { mkdir } from 'fs/promises';
 
 const MAX_MESSAGE_HISTORY = parseInt(process.env.MAX_MESSAGE_HISTORY || '100000', 10);
 
@@ -49,10 +52,28 @@ export class AgentService {
   private pendingPlanToolUseId: string | null = null;
   private pendingPlanInput: unknown | null = null;
   private pendingPlanResolve: ((value: boolean) => void) | null = null;
+  private outputFileStream: WriteStream | null = null;
 
   async initialize(): Promise<void> {
     try {
       logger.info('Initializing Claude Agent SDK with v1 API...');
+
+      // Initialize output file stream if specified
+      const outputFile = process.env.STREAM_JSON_OUTPUT_FILE;
+      if (outputFile) {
+        try {
+          // Ensure the directory exists
+          const dir = dirname(outputFile);
+          await mkdir(dir, { recursive: true });
+
+          // Create write stream
+          this.outputFileStream = createWriteStream(outputFile, { flags: 'a' });
+          logger.info(`Stream JSON output will be written to: ${outputFile}`);
+        } catch (error) {
+          logger.error(`Failed to create output file stream: ${error}`);
+          throw error;
+        }
+      }
 
       // Resolve configuration from .claude/config.json and environment variables
       const config = await resolveConfig();
@@ -480,6 +501,15 @@ export class AgentService {
   private async processSDKMessage(msg: SDKMessage): Promise<void> {
     try {
       logger.debug('Processing SDK message:', JSON.stringify(msg, null, 2));
+
+      // Write to output file if stream is configured
+      if (this.outputFileStream) {
+        try {
+          this.outputFileStream.write(JSON.stringify(msg) + '\n');
+        } catch (error) {
+          logger.error('Failed to write to output file:', error);
+        }
+      }
 
       // Record metrics for result messages
       if (msg.type === 'result') {
@@ -1155,6 +1185,25 @@ export class AgentService {
         await this.queryProcessorPromise;
       } catch (error) {
         logger.error('Error waiting for query processor:', error);
+      }
+    }
+
+    // Close output file stream
+    if (this.outputFileStream) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          this.outputFileStream!.end((error) => {
+            if (error) {
+              logger.error('Error closing output file stream:', error);
+              reject(error);
+            } else {
+              logger.info('Output file stream closed');
+              resolve();
+            }
+          });
+        });
+      } catch (error) {
+        logger.error('Failed to close output file stream:', error);
       }
     }
 
