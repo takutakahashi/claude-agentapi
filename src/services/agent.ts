@@ -108,10 +108,15 @@ export class AgentService {
         queryOptions.options!.allowedTools = config.allowedTools;
       }
 
-      // Add environment variables if configured
+      // Add environment variables
+      // Start with parent process environment, then override with config.env
+      queryOptions.options!.env = {
+        ...process.env,
+        ...config.env,
+      };
+
       if (config.env && Object.keys(config.env).length > 0) {
-        logger.info(`Configuring ${Object.keys(config.env).length} environment variable(s)...`);
-        queryOptions.options!.env = config.env;
+        logger.info(`Configuring ${Object.keys(config.env).length} custom environment variable(s)...`);
       }
 
       // Add hooks if configured
