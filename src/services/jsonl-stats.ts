@@ -1,5 +1,4 @@
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -26,14 +25,14 @@ export interface AggregatedStats {
 }
 
 /**
- * Service to read and aggregate statistics from .claude/projects JSONL files
+ * Service to read and aggregate statistics from claude-agentapi's history.jsonl
  */
 export class JsonlStatsService {
-  private projectsDir: string;
+  private historyFilePath: string;
 
-  constructor(projectsDir?: string) {
-    // Default to ~/.claude/projects
-    this.projectsDir = projectsDir || path.join(process.env.HOME || '~', '.claude', 'projects');
+  constructor(historyFilePath?: string) {
+    // Default to STREAM_JSON_OUTPUT_FILE env var or /opt/claude-agentapi/history.jsonl
+    this.historyFilePath = historyFilePath || process.env.STREAM_JSON_OUTPUT_FILE || '/opt/claude-agentapi/history.jsonl';
   }
 
   /**
@@ -88,9 +87,9 @@ export class JsonlStatsService {
   }
 
   /**
-   * Get statistics for a specific session from JSONL file
+   * Get statistics for a specific session from history.jsonl file
    */
-  async getSessionStats(sessionId: string, projectPath?: string): Promise<AggregatedStats> {
+  async getSessionStats(sessionId?: string): Promise<AggregatedStats> {
     const stats: AggregatedStats = {
       totalInputTokens: 0,
       totalOutputTokens: 0,
@@ -102,34 +101,14 @@ export class JsonlStatsService {
     };
 
     try {
-      // Construct JSONL file path
-      let jsonlPath: string;
-      if (projectPath) {
-        // Convert project path to directory name (e.g., /home/user/project -> -home-user-project)
-        const dirName = projectPath.replace(/\//g, '-');
-        jsonlPath = path.join(this.projectsDir, dirName, `${sessionId}.jsonl`);
-      } else {
-        // Search for the session file
-        const dirs = fs.readdirSync(this.projectsDir, { withFileTypes: true })
-          .filter(dirent => dirent.isDirectory())
-          .map(dirent => dirent.name);
-
-        for (const dir of dirs) {
-          const candidatePath = path.join(this.projectsDir, dir, `${sessionId}.jsonl`);
-          if (fs.existsSync(candidatePath)) {
-            jsonlPath = candidatePath;
-            break;
-          }
-        }
-
-        if (!jsonlPath!) {
-          logger.warn(`JSONL file not found for session ${sessionId}`);
-          return stats;
-        }
+      // Check if history file exists
+      if (!fs.existsSync(this.historyFilePath)) {
+        logger.debug(`History file not found: ${this.historyFilePath}`);
+        return stats;
       }
 
       // Read and parse JSONL file
-      const content = fs.readFileSync(jsonlPath, 'utf-8');
+      const content = fs.readFileSync(this.historyFilePath, 'utf-8');
       const lines = content.trim().split('\n');
 
       for (const line of lines) {
@@ -137,6 +116,11 @@ export class JsonlStatsService {
 
         try {
           const record = JSON.parse(line);
+
+          // Filter by session ID if specified
+          if (sessionId && record.session_id !== sessionId) {
+            continue;
+          }
 
           // Check if this is an assistant message with usage data
           if (record.type === 'assistant' && record.message?.usage) {
@@ -160,90 +144,22 @@ export class JsonlStatsService {
       stats.totalTokens = stats.totalInputTokens + stats.totalOutputTokens +
                          stats.totalCacheCreationTokens + stats.totalCacheReadTokens;
 
-      logger.info(`Loaded stats for session ${sessionId}: ${stats.messageCount} messages, ${stats.totalTokens} tokens, $${stats.totalCostUsd.toFixed(4)}`);
+      const sessionInfo = sessionId ? `session ${sessionId}` : 'all sessions';
+      logger.info(`Loaded stats for ${sessionInfo}: ${stats.messageCount} messages, ${stats.totalTokens} tokens, $${stats.totalCostUsd.toFixed(4)}`);
 
       return stats;
     } catch (error) {
-      logger.error(`Failed to read JSONL stats for session ${sessionId}:`, error);
+      logger.error(`Failed to read JSONL stats:`, error);
       return stats;
     }
   }
 
   /**
-   * Get statistics for all sessions in a project
-   */
-  async getProjectStats(projectPath: string): Promise<Map<string, AggregatedStats>> {
-    const statsMap = new Map<string, AggregatedStats>();
-
-    try {
-      const dirName = projectPath.replace(/\//g, '-');
-      const projectDir = path.join(this.projectsDir, dirName);
-
-      if (!fs.existsSync(projectDir)) {
-        logger.warn(`Project directory not found: ${projectDir}`);
-        return statsMap;
-      }
-
-      const files = fs.readdirSync(projectDir)
-        .filter(file => file.endsWith('.jsonl'));
-
-      for (const file of files) {
-        const sessionId = path.basename(file, '.jsonl');
-        const stats = await this.getSessionStats(sessionId, projectPath);
-        statsMap.set(sessionId, stats);
-      }
-
-      return statsMap;
-    } catch (error) {
-      logger.error(`Failed to read project stats for ${projectPath}:`, error);
-      return statsMap;
-    }
-  }
-
-  /**
-   * Get aggregated statistics across all sessions
+   * Get aggregated statistics across all sessions in history file
    */
   async getAllStats(): Promise<AggregatedStats> {
-    const aggregated: AggregatedStats = {
-      totalInputTokens: 0,
-      totalOutputTokens: 0,
-      totalCacheCreationTokens: 0,
-      totalCacheReadTokens: 0,
-      totalTokens: 0,
-      totalCostUsd: 0,
-      messageCount: 0,
-    };
-
-    try {
-      const projectDirs = fs.readdirSync(this.projectsDir, { withFileTypes: true })
-        .filter(dirent => dirent.isDirectory())
-        .map(dirent => dirent.name);
-
-      for (const projectDir of projectDirs) {
-        const projectPath = path.join(this.projectsDir, projectDir);
-        const files = fs.readdirSync(projectPath)
-          .filter(file => file.endsWith('.jsonl'));
-
-        for (const file of files) {
-          const sessionId = path.basename(file, '.jsonl');
-          const projectPathOriginal = projectDir.replace(/-/g, '/');
-          const stats = await this.getSessionStats(sessionId, projectPathOriginal);
-
-          aggregated.totalInputTokens += stats.totalInputTokens;
-          aggregated.totalOutputTokens += stats.totalOutputTokens;
-          aggregated.totalCacheCreationTokens += stats.totalCacheCreationTokens;
-          aggregated.totalCacheReadTokens += stats.totalCacheReadTokens;
-          aggregated.totalTokens += stats.totalTokens;
-          aggregated.totalCostUsd += stats.totalCostUsd;
-          aggregated.messageCount += stats.messageCount;
-        }
-      }
-
-      return aggregated;
-    } catch (error) {
-      logger.error('Failed to read all stats:', error);
-      return aggregated;
-    }
+    // Call getSessionStats without sessionId to get all stats
+    return this.getSessionStats();
   }
 }
 
@@ -253,8 +169,8 @@ let jsonlStatsService: JsonlStatsService | null = null;
 /**
  * Initialize JSONL stats service
  */
-export function initializeJsonlStatsService(projectsDir?: string): JsonlStatsService {
-  jsonlStatsService = new JsonlStatsService(projectsDir);
+export function initializeJsonlStatsService(historyFilePath?: string): JsonlStatsService {
+  jsonlStatsService = new JsonlStatsService(historyFilePath);
   return jsonlStatsService;
 }
 
