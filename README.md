@@ -200,9 +200,34 @@ Use either API Key or OAuth Token (not both):
 - `CLAUDE_CODE_ENABLE_TELEMETRY` - Enable OpenTelemetry metrics export (set to `1` to enable)
 - `PROMETHEUS_PORT` - Prometheus metrics server port (default: 9464)
 
+#### Token Budget and Automatic Compaction
+The Claude Agent SDK automatically manages conversation history through **automatic compaction**. As the conversation approaches the model's context limit (e.g., 200K tokens), the SDK will automatically summarize the oldest parts of the conversation, replacing them with a condensed summary.
+
+**Key Points:**
+- **Default Trigger**: Auto-compaction triggers at approximately **83.5%** of the context window (around 167K tokens for a 200K window)
+- **Buffer Size**: Approximately 33K tokens (16.5%) are reserved as a buffer
+- **Seamless Operation**: Compaction happens automatically without interrupting the conversation
+- **Context Preservation**: Important context is preserved through intelligent summarization
+
+**Configuration:**
+- `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` - Control when auto-compaction triggers (1-100)
+  - Lower values (e.g., 70) trigger earlier compaction for more aggressive memory management
+  - Higher values (e.g., 90) allow more context before compaction
+  - Default: ~83.5 (optimal for most use cases)
+
+**Example:**
+```bash
+# Trigger compaction at 70% instead of 83.5%
+export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=70
+npx claude-agentapi
+```
+
+**Note:** This compaction mechanism is the same as used by Claude Code CLI, ensuring consistent behavior and token usage patterns.
+
 #### Other Configuration
 - `DEBUG` - Enable debug logging (default: false)
-- `MAX_MESSAGE_HISTORY` - Maximum messages to keep in history (default: 100)
+- `MAX_MESSAGE_HISTORY` - Maximum messages to keep in API response history (default: 100,000)
+  - This is separate from token budget and only affects the `/messages` endpoint
 - `STREAM_JSON_OUTPUT_FILE` - Path to write stream JSON output (for debugging and logging)
 
 ## Usage
