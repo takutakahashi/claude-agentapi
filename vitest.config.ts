@@ -15,5 +15,13 @@ export default defineConfig({
         '**/types/**',
       ],
     },
+    server: {
+      deps: {
+        inline: ['zod'],
+      },
+    },
+  },
+  resolve: {
+    conditions: ['import', 'module', 'browser', 'default'],
   },
 });
