@@ -108,32 +108,10 @@ export class AgentService {
         queryOptions.options!.allowedTools = config.allowedTools;
       }
 
-      // Add environment variables
-      // Filter and pass Claude Code related environment variables from parent process
-      const claudeEnvVars: Record<string, string> = {};
-      for (const [key, value] of Object.entries(process.env)) {
-        // Only pass environment variables that are relevant to Claude Code
-        if (value !== undefined && (
-          key.startsWith('CLAUDE_') ||
-          key.startsWith('ANTHROPIC_') ||
-          key.startsWith('AWS_') ||
-          key === 'DEBUG' ||
-          key === 'NODE_ENV'
-        )) {
-          claudeEnvVars[key] = value;
-        }
-      }
-
-      // Merge with config.env (config.env takes precedence)
-      queryOptions.options!.env = {
-        ...claudeEnvVars,
-        ...config.env,
-      };
-
-      const totalEnvVars = Object.keys(queryOptions.options!.env).length;
-      const customEnvVars = config.env ? Object.keys(config.env).length : 0;
-      if (totalEnvVars > 0) {
-        logger.info(`Configuring ${totalEnvVars} environment variable(s) (${customEnvVars} custom, ${totalEnvVars - customEnvVars} inherited)`);
+      // Add environment variables if configured
+      if (config.env && Object.keys(config.env).length > 0) {
+        logger.info(`Configuring ${Object.keys(config.env).length} environment variable(s)...`);
+        queryOptions.options!.env = config.env;
       }
 
       // Add hooks if configured
