@@ -13,6 +13,21 @@ export const MessageSchema = z.object({
   parentToolUseId: z.string().optional(), // ID of parent tool_use (for 'tool_result' role messages)
   status: z.enum(['success', 'error']).optional(), // Execution status (for 'tool_result' role messages)
   error: z.string().optional(), // Error message (for 'tool_result' role messages with status='error')
+  // Token usage and cost tracking (for 'assistant' role messages)
+  usage: z.object({
+    input_tokens: z.number().optional(),
+    output_tokens: z.number().optional(),
+    cache_read_input_tokens: z.number().optional(),
+    cache_creation_input_tokens: z.number().optional(),
+  }).optional(),
+  cost_usd: z.number().optional(), // Cost in USD (for 'assistant' role messages)
+  model_usage: z.record(z.string(), z.object({
+    input_tokens: z.number().optional(),
+    output_tokens: z.number().optional(),
+    cache_read_input_tokens: z.number().optional(),
+    cache_creation_input_tokens: z.number().optional(),
+    cost_usd: z.number().optional(),
+  })).optional(), // Per-model usage breakdown (for 'assistant' role messages)
 });
 
 export type Message = z.infer<typeof MessageSchema>;

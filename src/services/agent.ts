@@ -669,6 +669,68 @@ export class AgentService {
           throw userError;
         }
       } else if (msg.type === 'result') {
+        // Extract usage information from result message
+        const usage = 'usage' in msg && typeof msg.usage === 'object' && msg.usage !== null
+          ? msg.usage as {
+              input_tokens?: number;
+              output_tokens?: number;
+              cache_read_input_tokens?: number;
+              cache_creation_input_tokens?: number;
+            }
+          : undefined;
+
+        const cost_usd = 'total_cost_usd' in msg && typeof msg.total_cost_usd === 'number'
+          ? msg.total_cost_usd
+          : undefined;
+
+        const model_usage = 'modelUsage' in msg && typeof msg.modelUsage === 'object' && msg.modelUsage !== null
+          ? msg.modelUsage as Record<string, {
+              inputTokens?: number;
+              outputTokens?: number;
+              cacheReadInputTokens?: number;
+              cacheCreationInputTokens?: number;
+              costUSD?: number;
+            }>
+          : undefined;
+
+        // Convert modelUsage to snake_case format for consistency
+        const converted_model_usage = model_usage ? Object.fromEntries(
+          Object.entries(model_usage).map(([model, usage]) => [
+            model,
+            {
+              input_tokens: usage.inputTokens,
+              output_tokens: usage.outputTokens,
+              cache_read_input_tokens: usage.cacheReadInputTokens,
+              cache_creation_input_tokens: usage.cacheCreationInputTokens,
+              cost_usd: usage.costUSD,
+            },
+          ])
+        ) : undefined;
+
+        // Find the last assistant message and add usage information to it
+        if (usage || cost_usd || converted_model_usage) {
+          // Search backwards for the most recent assistant message
+          for (let i = this.messages.length - 1; i >= 0; i--) {
+            if (this.messages[i].role === 'assistant') {
+              // Update the message with usage information
+              this.messages[i].usage = usage;
+              this.messages[i].cost_usd = cost_usd;
+              this.messages[i].model_usage = converted_model_usage;
+
+              // Broadcast the updated message
+              sessionService.broadcastMessageUpdate(this.messages[i]);
+
+              logger.debug('Added usage information to assistant message', {
+                message_id: this.messages[i].id,
+                has_usage: !!usage,
+                has_cost: !!cost_usd,
+                has_model_usage: !!converted_model_usage,
+              });
+              break;
+            }
+          }
+        }
+
         // Query completed
         if (msg.subtype === 'success') {
           logger.info('Query completed successfully');
@@ -1000,6 +1062,20 @@ export class AgentService {
       parentToolUseId?: string;
       status?: 'success' | 'error';
       error?: string;
+      usage?: {
+        input_tokens?: number;
+        output_tokens?: number;
+        cache_read_input_tokens?: number;
+        cache_creation_input_tokens?: number;
+      };
+      cost_usd?: number;
+      model_usage?: Record<string, {
+        input_tokens?: number;
+        output_tokens?: number;
+        cache_read_input_tokens?: number;
+        cache_creation_input_tokens?: number;
+        cost_usd?: number;
+      }>;
     }
   ): Message {
     const message: Message = {
