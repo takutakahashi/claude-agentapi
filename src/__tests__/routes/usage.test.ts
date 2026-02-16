@@ -55,9 +55,9 @@ describe('GET /usage', () => {
       }),
     };
 
-    vi.mocked(metricsModule.getMetricsService).mockReturnValue(mockMetricsService as never);
-    vi.mocked(agentModule.agentService.getStatus).mockReturnValue('stable');
-    vi.mocked(agentModule.agentService.getMessages).mockReturnValue([
+    (metricsModule.getMetricsService as ReturnType<typeof vi.fn>).mockReturnValue(mockMetricsService as never);
+    (agentModule.agentService.getStatus as ReturnType<typeof vi.fn>).mockReturnValue('stable');
+    (agentModule.agentService.getMessages as ReturnType<typeof vi.fn>).mockReturnValue([
       { id: 1, role: 'user', content: 'test', time: '2024-01-01T00:00:00Z', type: 'normal' },
     ] as never);
 
@@ -84,9 +84,9 @@ describe('GET /usage', () => {
   });
 
   it('should return zero stats when metrics service is not available', async () => {
-    vi.mocked(metricsModule.getMetricsService).mockReturnValue(null);
-    vi.mocked(agentModule.agentService.getStatus).mockReturnValue('stable');
-    vi.mocked(agentModule.agentService.getMessages).mockReturnValue([
+    (metricsModule.getMetricsService as ReturnType<typeof vi.fn>).mockReturnValue(null);
+    (agentModule.agentService.getStatus as ReturnType<typeof vi.fn>).mockReturnValue('stable');
+    (agentModule.agentService.getMessages as ReturnType<typeof vi.fn>).mockReturnValue([
       { id: 1, role: 'user', content: 'test', time: '2024-01-01T00:00:00Z', type: 'normal' },
       { id: 2, role: 'assistant', content: 'response', time: '2024-01-01T00:00:01Z', type: 'normal' },
     ] as never);
@@ -114,7 +114,7 @@ describe('GET /usage', () => {
   });
 
   it('should handle errors gracefully', async () => {
-    vi.mocked(metricsModule.getMetricsService).mockImplementation(() => {
+    (metricsModule.getMetricsService as ReturnType<typeof vi.fn>).mockImplementation(() => {
       throw new Error('Metrics service error');
     });
 
