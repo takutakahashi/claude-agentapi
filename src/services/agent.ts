@@ -53,6 +53,22 @@ export class AgentService {
   private pendingPlanInput: unknown | null = null;
   private pendingPlanResolve: ((value: boolean) => void) | null = null;
   private outputFileStream: WriteStream | null = null;
+  private latestUsage: {
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      cache_read_input_tokens?: number;
+      cache_creation_input_tokens?: number;
+    };
+    cost_usd?: number;
+    model_usage?: Record<string, {
+      input_tokens?: number;
+      output_tokens?: number;
+      cache_read_input_tokens?: number;
+      cache_creation_input_tokens?: number;
+      cost_usd?: number;
+    }>;
+  } | null = null;
 
   async initialize(): Promise<void> {
     try {
@@ -539,9 +555,22 @@ export class AgentService {
           if (textBlocks.length > 0) {
             const text = textBlocks.map((block: { type: 'text'; text: string }) => block.text).join('\n');
             if (text.trim()) {
-              const assistantMessage = this.addMessage('assistant', text);
+              // Add usage information if available
+              const usageOptions = this.latestUsage ? {
+                usage: this.latestUsage.usage,
+                cost_usd: this.latestUsage.cost_usd,
+                model_usage: this.latestUsage.model_usage,
+              } : undefined;
+
+              const assistantMessage = this.addMessage('assistant', text, undefined, usageOptions);
               sessionService.broadcastMessageUpdate(assistantMessage);
-              logger.debug('Assistant text message broadcasted', { message_id: assistantMessage.id });
+              logger.debug('Assistant text message broadcasted', {
+                message_id: assistantMessage.id,
+                has_usage: !!usageOptions,
+              });
+
+              // Clear usage after attaching to message
+              this.latestUsage = null;
             }
           }
 
@@ -669,6 +698,50 @@ export class AgentService {
           throw userError;
         }
       } else if (msg.type === 'result') {
+        // Store usage information from result message
+        const usage = 'usage' in msg && typeof msg.usage === 'object' && msg.usage !== null
+          ? msg.usage as {
+              input_tokens?: number;
+              output_tokens?: number;
+              cache_read_input_tokens?: number;
+              cache_creation_input_tokens?: number;
+            }
+          : undefined;
+
+        const cost_usd = 'total_cost_usd' in msg && typeof msg.total_cost_usd === 'number'
+          ? msg.total_cost_usd
+          : undefined;
+
+        const model_usage = 'modelUsage' in msg && typeof msg.modelUsage === 'object' && msg.modelUsage !== null
+          ? msg.modelUsage as Record<string, {
+              inputTokens?: number;
+              outputTokens?: number;
+              cacheReadInputTokens?: number;
+              cacheCreationInputTokens?: number;
+              costUSD?: number;
+            }>
+          : undefined;
+
+        // Convert modelUsage to snake_case format for consistency
+        const converted_model_usage = model_usage ? Object.fromEntries(
+          Object.entries(model_usage).map(([model, usage]) => [
+            model,
+            {
+              input_tokens: usage.inputTokens,
+              output_tokens: usage.outputTokens,
+              cache_read_input_tokens: usage.cacheReadInputTokens,
+              cache_creation_input_tokens: usage.cacheCreationInputTokens,
+              cost_usd: usage.costUSD,
+            },
+          ])
+        ) : undefined;
+
+        this.latestUsage = {
+          usage,
+          cost_usd,
+          model_usage: converted_model_usage,
+        };
+
         // Query completed
         if (msg.subtype === 'success') {
           logger.info('Query completed successfully');
@@ -1000,6 +1073,20 @@ export class AgentService {
       parentToolUseId?: string;
       status?: 'success' | 'error';
       error?: string;
+      usage?: {
+        input_tokens?: number;
+        output_tokens?: number;
+        cache_read_input_tokens?: number;
+        cache_creation_input_tokens?: number;
+      };
+      cost_usd?: number;
+      model_usage?: Record<string, {
+        input_tokens?: number;
+        output_tokens?: number;
+        cache_read_input_tokens?: number;
+        cache_creation_input_tokens?: number;
+        cost_usd?: number;
+      }>;
     }
   ): Message {
     const message: Message = {
