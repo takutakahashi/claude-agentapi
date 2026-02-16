@@ -4,6 +4,8 @@ import { agentService } from './services/agent.js';
 import { logger } from './utils/logger.js';
 import { initializeTelemetry, shutdownTelemetry } from './utils/telemetry.js';
 import { initializeMetricsService } from './services/metrics.js';
+import { initializeJsonlStatsService } from './services/jsonl-stats.js';
+import { initializeJsonlMetricsExporter } from './services/jsonl-metrics-exporter.js';
 import { randomUUID } from 'crypto';
 
 // Parse command line arguments
@@ -25,10 +27,18 @@ async function main() {
       logger.info('Initializing telemetry...');
       initializeTelemetry(true, PROMETHEUS_PORT);
 
+      // Initialize JSONL stats service
+      initializeJsonlStatsService();
+      logger.info('JSONL stats service initialized');
+
       // Initialize metrics service with a session ID
       const sessionId = randomUUID();
       initializeMetricsService(sessionId);
-      logger.info(`Telemetry initialized with session ID: ${sessionId}`);
+      logger.info(`Metrics service initialized with session ID: ${sessionId}`);
+
+      // Initialize JSONL metrics exporter to expose statistics via Prometheus
+      initializeJsonlMetricsExporter(sessionId);
+      logger.info('JSONL metrics exporter initialized');
     }
 
     // Initialize agent service

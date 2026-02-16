@@ -1,6 +1,7 @@
 import { Counter, Histogram, Meter } from '@opentelemetry/api';
 import { getMeterProvider } from '../utils/telemetry.js';
 import { logger } from '../utils/logger.js';
+import { getJsonlStatsService } from './jsonl-stats.js';
 
 /**
  * Metrics service following Claude Code's metric naming and structure
@@ -291,9 +292,10 @@ export class MetricsService {
   }
 
   /**
-   * Get current usage statistics (returns last API call usage, not cumulative)
+   * Get current usage statistics from JSONL files (cumulative for session)
+   * Falls back to last API call usage if JSONL stats are not available
    */
-  getUsageStats(): {
+  async getUsageStats(): Promise<{
     sessionId: string;
     tokens: {
       input: number;
@@ -305,7 +307,35 @@ export class MetricsService {
     cost: {
       totalUsd: number;
     };
-  } {
+  }> {
+    // Try to get stats from JSONL files first
+    const jsonlStats = getJsonlStatsService();
+    if (jsonlStats) {
+      try {
+        const stats = await jsonlStats.getSessionStats(this.sessionId);
+        if (stats.messageCount > 0) {
+          logger.debug(`Returning usage stats from JSONL for session ${this.sessionId}`);
+          return {
+            sessionId: this.sessionId,
+            tokens: {
+              input: stats.totalInputTokens,
+              output: stats.totalOutputTokens,
+              cacheRead: stats.totalCacheReadTokens,
+              cacheCreation: stats.totalCacheCreationTokens,
+              total: stats.totalTokens,
+            },
+            cost: {
+              totalUsd: stats.totalCostUsd,
+            },
+          };
+        }
+      } catch (error) {
+        logger.warn(`Failed to get JSONL stats for session ${this.sessionId}, falling back to tracked stats:`, error);
+      }
+    }
+
+    // Fallback to last API call usage
+    logger.debug(`Returning tracked usage stats for session ${this.sessionId}`);
     return {
       sessionId: this.sessionId,
       tokens: {

@@ -47,7 +47,7 @@ interface UsageStats {
  *   }
  * }
  */
-router.get('/usage', (_req, res) => {
+router.get('/usage', async (_req, res) => {
   try {
     const metricsService = getMetricsService();
 
@@ -74,8 +74,8 @@ router.get('/usage', (_req, res) => {
       return res.json(stats);
     }
 
-    // Get usage statistics from metrics service
-    const usageStats = metricsService.getUsageStats();
+    // Get usage statistics from metrics service (now async)
+    const usageStats = await metricsService.getUsageStats();
 
     const stats: UsageStats = {
       tokens: {

@@ -40,7 +40,7 @@ describe('GET /usage', () => {
   it('should return usage statistics when metrics service is available', async () => {
     // Mock metrics service
     const mockMetricsService = {
-      getUsageStats: vi.fn().mockReturnValue({
+      getUsageStats: vi.fn().mockResolvedValue({
         sessionId: 'test-session',
         tokens: {
           input: 1000,
