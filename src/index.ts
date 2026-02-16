@@ -4,6 +4,7 @@ import { agentService } from './services/agent.js';
 import { logger } from './utils/logger.js';
 import { initializeTelemetry, shutdownTelemetry } from './utils/telemetry.js';
 import { initializeMetricsService } from './services/metrics.js';
+import { resolveConfig } from './utils/config.js';
 import { randomUUID } from 'crypto';
 
 // Parse command line arguments
@@ -20,14 +21,17 @@ async function main() {
   try {
     logger.info('Starting agentapi-bedrock-server...');
 
+    // Load configuration (including token budget)
+    const config = await resolveConfig();
+
     // Initialize telemetry
     if (TELEMETRY_ENABLED) {
       logger.info('Initializing telemetry...');
       initializeTelemetry(true, PROMETHEUS_PORT);
 
-      // Initialize metrics service with a session ID
+      // Initialize metrics service with a session ID and token budget
       const sessionId = randomUUID();
-      initializeMetricsService(sessionId);
+      initializeMetricsService(sessionId, config.tokenBudget);
       logger.info(`Telemetry initialized with session ID: ${sessionId}`);
     }
 

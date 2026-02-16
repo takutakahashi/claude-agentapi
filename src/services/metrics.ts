@@ -1,6 +1,7 @@
 import { Counter, Histogram, Meter } from '@opentelemetry/api';
 import { getMeterProvider } from '../utils/telemetry.js';
 import { logger } from '../utils/logger.js';
+import type { TokenBudgetConfig } from '../types/config.js';
 
 /**
  * Metrics service following Claude Code's metric naming and structure
@@ -26,6 +27,11 @@ export class MetricsService {
   private sessionStartTime: number = 0;
   private lastActivityTime: number = 0;
 
+  // Token budget management
+  private tokenBudget: TokenBudgetConfig | null = null;
+  private budgetWarningShown: boolean = false;
+  private turnCount: number = 0;
+
   // Usage tracking (cumulative for metrics)
   private totalInputTokens: number = 0;
   private totalOutputTokens: number = 0;
@@ -40,8 +46,9 @@ export class MetricsService {
   private lastCacheCreationTokens: number = 0;
   private lastCostUsd: number = 0;
 
-  constructor(sessionId: string) {
+  constructor(sessionId: string, tokenBudget?: TokenBudgetConfig) {
     this.sessionId = sessionId;
+    this.tokenBudget = tokenBudget || null;
     this.initializeMetrics();
   }
 
@@ -225,6 +232,12 @@ export class MetricsService {
       this.totalCacheCreationTokens += tokens.cacheCreation;
     }
 
+    // Increment turn count
+    this.turnCount++;
+
+    // Check token budget limits
+    this.checkTokenBudget();
+
     // Send to metrics if available
     if (this.tokenCounter) {
       const baseAttrs = {
@@ -320,6 +333,111 @@ export class MetricsService {
       },
     };
   }
+
+  /**
+   * Get cumulative usage statistics (returns total usage across all API calls)
+   */
+  getCumulativeUsageStats(): {
+    sessionId: string;
+    tokens: {
+      input: number;
+      output: number;
+      cacheRead: number;
+      cacheCreation: number;
+      total: number;
+    };
+    cost: {
+      totalUsd: number;
+    };
+  } {
+    return {
+      sessionId: this.sessionId,
+      tokens: {
+        input: this.totalInputTokens,
+        output: this.totalOutputTokens,
+        cacheRead: this.totalCacheReadTokens,
+        cacheCreation: this.totalCacheCreationTokens,
+        total: this.totalInputTokens + this.totalOutputTokens + this.totalCacheReadTokens + this.totalCacheCreationTokens,
+      },
+      cost: {
+        totalUsd: this.totalCostUsd,
+      },
+    };
+  }
+
+  /**
+   * Check token budget limits and log warnings
+   */
+  private checkTokenBudget(): void {
+    if (!this.tokenBudget) return;
+
+    const totalTokens = this.totalInputTokens + this.totalOutputTokens +
+                        this.totalCacheReadTokens + this.totalCacheCreationTokens;
+    const warningThreshold = this.tokenBudget.warningThresholdPercent || 80;
+
+    // Check max tokens limit
+    if (this.tokenBudget.maxTokens) {
+      const tokenUsagePercent = (totalTokens / this.tokenBudget.maxTokens) * 100;
+
+      if (totalTokens >= this.tokenBudget.maxTokens) {
+        logger.warn(`Token budget exceeded: ${totalTokens}/${this.tokenBudget.maxTokens} tokens (${tokenUsagePercent.toFixed(1)}%)`);
+      } else if (tokenUsagePercent >= warningThreshold && !this.budgetWarningShown) {
+        logger.warn(`Token budget warning: ${totalTokens}/${this.tokenBudget.maxTokens} tokens (${tokenUsagePercent.toFixed(1)}%)`);
+        this.budgetWarningShown = true;
+      }
+    }
+
+    // Check max cost limit
+    if (this.tokenBudget.maxCostUsd) {
+      const costUsagePercent = (this.totalCostUsd / this.tokenBudget.maxCostUsd) * 100;
+
+      if (this.totalCostUsd >= this.tokenBudget.maxCostUsd) {
+        logger.warn(`Cost budget exceeded: $${this.totalCostUsd.toFixed(4)}/$${this.tokenBudget.maxCostUsd} (${costUsagePercent.toFixed(1)}%)`);
+      } else if (costUsagePercent >= warningThreshold && !this.budgetWarningShown) {
+        logger.warn(`Cost budget warning: $${this.totalCostUsd.toFixed(4)}/$${this.tokenBudget.maxCostUsd} (${costUsagePercent.toFixed(1)}%)`);
+        this.budgetWarningShown = true;
+      }
+    }
+
+    // Check max turns limit
+    if (this.tokenBudget.maxTurns && this.turnCount >= this.tokenBudget.maxTurns) {
+      logger.warn(`Turn limit reached: ${this.turnCount}/${this.tokenBudget.maxTurns} turns`);
+    }
+  }
+
+  /**
+   * Get budget status
+   */
+  getBudgetStatus(): {
+    budget: TokenBudgetConfig | null;
+    current: {
+      tokens: number;
+      costUsd: number;
+      turns: number;
+    };
+    limits: {
+      tokensExceeded: boolean;
+      costExceeded: boolean;
+      turnsExceeded: boolean;
+    };
+  } {
+    const totalTokens = this.totalInputTokens + this.totalOutputTokens +
+                        this.totalCacheReadTokens + this.totalCacheCreationTokens;
+
+    return {
+      budget: this.tokenBudget,
+      current: {
+        tokens: totalTokens,
+        costUsd: this.totalCostUsd,
+        turns: this.turnCount,
+      },
+      limits: {
+        tokensExceeded: this.tokenBudget?.maxTokens ? totalTokens >= this.tokenBudget.maxTokens : false,
+        costExceeded: this.tokenBudget?.maxCostUsd ? this.totalCostUsd >= this.tokenBudget.maxCostUsd : false,
+        turnsExceeded: this.tokenBudget?.maxTurns ? this.turnCount >= this.tokenBudget.maxTurns : false,
+      },
+    };
+  }
 }
 
 // Singleton instance
@@ -328,8 +446,8 @@ let metricsService: MetricsService | null = null;
 /**
  * Initialize metrics service
  */
-export function initializeMetricsService(sessionId: string): MetricsService {
-  metricsService = new MetricsService(sessionId);
+export function initializeMetricsService(sessionId: string, tokenBudget?: TokenBudgetConfig): MetricsService {
+  metricsService = new MetricsService(sessionId, tokenBudget);
   return metricsService;
 }
 

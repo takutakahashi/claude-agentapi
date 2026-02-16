@@ -100,4 +100,107 @@ describe('MetricsService', () => {
       expect(stats.cost.totalUsd).toBe(0.1); // Last recorded cost
     });
   });
+
+  describe('getCumulativeUsageStats', () => {
+    it('should return cumulative stats across all API calls', () => {
+      // First API call
+      metricsService.recordTokenUsage({
+        input: 100,
+        output: 50,
+      }, 'test-model');
+
+      // Second API call
+      metricsService.recordTokenUsage({
+        input: 200,
+        output: 150,
+        cacheRead: 50,
+        cacheCreation: 25,
+      }, 'test-model');
+
+      const stats = metricsService.getCumulativeUsageStats();
+
+      // Should return cumulative usage
+      expect(stats.tokens.input).toBe(300); // 100 + 200
+      expect(stats.tokens.output).toBe(200); // 50 + 150
+      expect(stats.tokens.cacheRead).toBe(50);
+      expect(stats.tokens.cacheCreation).toBe(25);
+      expect(stats.tokens.total).toBe(575); // 300 + 200 + 50 + 25
+    });
+
+    it('should return cumulative cost across all API calls', () => {
+      metricsService.recordCost(0.05, 'model-1');
+      metricsService.recordCost(0.03, 'model-2');
+
+      const stats = metricsService.getCumulativeUsageStats();
+
+      // Should return cumulative cost
+      expect(stats.cost.totalUsd).toBe(0.08); // 0.05 + 0.03
+    });
+  });
+
+  describe('getBudgetStatus', () => {
+    it('should return budget status without budget configured', () => {
+      const status = metricsService.getBudgetStatus();
+
+      expect(status.budget).toBeNull();
+      expect(status.current.tokens).toBe(0);
+      expect(status.current.costUsd).toBe(0);
+      expect(status.current.turns).toBe(0);
+      expect(status.limits.tokensExceeded).toBe(false);
+      expect(status.limits.costExceeded).toBe(false);
+      expect(status.limits.turnsExceeded).toBe(false);
+    });
+
+    it('should track token budget limits', () => {
+      const serviceWithBudget = new MetricsService('test-session', {
+        maxTokens: 1000,
+        maxCostUsd: 1.0,
+        maxTurns: 10,
+      });
+
+      // Record usage
+      serviceWithBudget.recordTokenUsage({
+        input: 500,
+        output: 300,
+      }, 'test-model');
+
+      const status = serviceWithBudget.getBudgetStatus();
+
+      expect(status.budget).toEqual({
+        maxTokens: 1000,
+        maxCostUsd: 1.0,
+        maxTurns: 10,
+      });
+      expect(status.current.tokens).toBe(800);
+      expect(status.current.turns).toBe(1);
+      expect(status.limits.tokensExceeded).toBe(false);
+      expect(status.limits.turnsExceeded).toBe(false);
+    });
+
+    it('should detect when budget is exceeded', () => {
+      const serviceWithBudget = new MetricsService('test-session', {
+        maxTokens: 500,
+        maxCostUsd: 0.05,
+        maxTurns: 2,
+      });
+
+      // Exceed token budget
+      serviceWithBudget.recordTokenUsage({
+        input: 400,
+        output: 200,
+      }, 'test-model');
+
+      // Exceed cost budget
+      serviceWithBudget.recordCost(0.06, 'test-model');
+
+      // Exceed turn budget
+      serviceWithBudget.recordTokenUsage({ input: 10 }, 'test-model');
+
+      const status = serviceWithBudget.getBudgetStatus();
+
+      expect(status.limits.tokensExceeded).toBe(true); // 600 > 500
+      expect(status.limits.costExceeded).toBe(true); // 0.06 > 0.05
+      expect(status.limits.turnsExceeded).toBe(true); // 2 >= 2
+    });
+  });
 });

@@ -154,6 +154,23 @@ export interface SdkPluginConfig {
 export type SettingSource = 'user' | 'project' | 'local';
 
 /**
+ * Token budget configuration
+ * Helps manage and optimize token usage across sessions
+ */
+export interface TokenBudgetConfig {
+  /** Maximum total tokens allowed (input + output + cache) */
+  maxTokens?: number;
+  /** Maximum USD cost allowed */
+  maxCostUsd?: number;
+  /** Maximum number of conversation turns */
+  maxTurns?: number;
+  /** Maximum message history length (for automatic trimming) */
+  maxMessageHistory?: number;
+  /** Warning threshold as percentage of budget (0-100) */
+  warningThresholdPercent?: number;
+}
+
+/**
  * Merged configuration with environment variable overrides
  */
 export interface ResolvedConfig {
@@ -177,4 +194,6 @@ export interface ResolvedConfig {
   env?: Record<string, string>;
   /** Setting sources for loading CLAUDE.md and settings files */
   settingSources?: SettingSource[];
+  /** Token budget configuration */
+  tokenBudget?: TokenBudgetConfig;
 }

@@ -1,7 +1,7 @@
 import { readFile, access, stat } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
-import type { ClaudeConfig, ResolvedConfig, MCPServersConfig, PluginsConfig, ClaudeSettings, SdkPluginConfig, SettingSource } from '../types/config.js';
+import type { ClaudeConfig, ResolvedConfig, MCPServersConfig, PluginsConfig, ClaudeSettings, SdkPluginConfig, SettingSource, TokenBudgetConfig } from '../types/config.js';
 import { logger } from './logger.js';
 
 /**
@@ -330,6 +330,9 @@ export async function resolveConfig(): Promise<ResolvedConfig> {
     }
   }
 
+  // Load token budget configuration from environment variables
+  const tokenBudget: TokenBudgetConfig | undefined = loadTokenBudgetFromEnv();
+
   const resolved: ResolvedConfig = {
     workingDirectory,
     permissionMode,
@@ -341,6 +344,7 @@ export async function resolveConfig(): Promise<ResolvedConfig> {
     allowedTools: claudeConfig.allowedTools,
     env: claudeConfig.env,
     settingSources,
+    tokenBudget,
   };
 
   // Log configuration summary
@@ -395,4 +399,35 @@ function filterEnabledMCPServers(servers?: MCPServersConfig): MCPServersConfig |
   }
 
   return Object.keys(enabled).length > 0 ? enabled : undefined;
+}
+
+/**
+ * Load token budget configuration from environment variables
+ */
+function loadTokenBudgetFromEnv(): TokenBudgetConfig | undefined {
+  const maxTokens = process.env.TOKEN_BUDGET_MAX_TOKENS ? parseInt(process.env.TOKEN_BUDGET_MAX_TOKENS, 10) : undefined;
+  const maxCostUsd = process.env.TOKEN_BUDGET_MAX_COST_USD ? parseFloat(process.env.TOKEN_BUDGET_MAX_COST_USD) : undefined;
+  const maxTurns = process.env.TOKEN_BUDGET_MAX_TURNS ? parseInt(process.env.TOKEN_BUDGET_MAX_TURNS, 10) : undefined;
+  const maxMessageHistory = process.env.MAX_MESSAGE_HISTORY ? parseInt(process.env.MAX_MESSAGE_HISTORY, 10) : undefined;
+  const warningThresholdPercent = process.env.TOKEN_BUDGET_WARNING_THRESHOLD ? parseInt(process.env.TOKEN_BUDGET_WARNING_THRESHOLD, 10) : undefined;
+
+  // Only return budget config if at least one limit is set
+  if (maxTokens || maxCostUsd || maxTurns || maxMessageHistory) {
+    const budget: TokenBudgetConfig = {
+      maxTokens,
+      maxCostUsd,
+      maxTurns,
+      maxMessageHistory,
+      warningThresholdPercent,
+    };
+    logger.info('Token budget configuration loaded:');
+    if (maxTokens) logger.info(`  Max tokens: ${maxTokens}`);
+    if (maxCostUsd) logger.info(`  Max cost: $${maxCostUsd}`);
+    if (maxTurns) logger.info(`  Max turns: ${maxTurns}`);
+    if (maxMessageHistory) logger.info(`  Max message history: ${maxMessageHistory}`);
+    if (warningThresholdPercent) logger.info(`  Warning threshold: ${warningThresholdPercent}%`);
+    return budget;
+  }
+
+  return undefined;
 }

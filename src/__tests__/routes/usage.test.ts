@@ -129,3 +129,170 @@ describe('GET /usage', () => {
     });
   });
 });
+
+describe('GET /usage/cumulative', () => {
+  let app: express.Express;
+
+  beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use(usageRouter);
+
+    // Reset all mocks
+    vi.clearAllMocks();
+  });
+
+  it('should return cumulative usage statistics when metrics service is available', async () => {
+    // Mock metrics service
+    const mockMetricsService = {
+      getCumulativeUsageStats: vi.fn().mockReturnValue({
+        sessionId: 'test-session',
+        tokens: {
+          input: 5000,
+          output: 2500,
+          cacheRead: 1000,
+          cacheCreation: 500,
+          total: 9000,
+        },
+        cost: {
+          totalUsd: 0.25,
+        },
+      }),
+    };
+
+    (metricsModule.getMetricsService as ReturnType<typeof vi.fn>).mockReturnValue(mockMetricsService as never);
+    (agentModule.agentService.getStatus as ReturnType<typeof vi.fn>).mockReturnValue('running');
+    (agentModule.agentService.getMessages as ReturnType<typeof vi.fn>).mockReturnValue([
+      { id: 1, role: 'user', content: 'test', time: '2024-01-01T00:00:00Z', type: 'normal' },
+    ] as never);
+
+    const response = await request(app).get('/usage/cumulative');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      tokens: {
+        input: 5000,
+        output: 2500,
+        cacheRead: 1000,
+        cacheCreation: 500,
+        total: 9000,
+      },
+      cost: {
+        totalUsd: 0.25,
+      },
+      session: {
+        id: 'test-session',
+        status: 'running',
+        messageCount: 1,
+      },
+    });
+  });
+
+  it('should return zero stats when metrics service is not available', async () => {
+    (metricsModule.getMetricsService as ReturnType<typeof vi.fn>).mockReturnValue(null);
+    (agentModule.agentService.getStatus as ReturnType<typeof vi.fn>).mockReturnValue('stable');
+    (agentModule.agentService.getMessages as ReturnType<typeof vi.fn>).mockReturnValue([]);
+
+    const response = await request(app).get('/usage/cumulative');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      tokens: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheCreation: 0,
+        total: 0,
+      },
+      cost: {
+        totalUsd: 0,
+      },
+      session: {
+        id: 'default',
+        status: 'stable',
+        messageCount: 0,
+      },
+    });
+  });
+});
+
+describe('GET /usage/budget', () => {
+  let app: express.Express;
+
+  beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    app.use(usageRouter);
+
+    // Reset all mocks
+    vi.clearAllMocks();
+  });
+
+  it('should return budget status when metrics service is available', async () => {
+    const mockMetricsService = {
+      getBudgetStatus: vi.fn().mockReturnValue({
+        budget: {
+          maxTokens: 10000,
+          maxCostUsd: 1.0,
+          maxTurns: 50,
+          warningThresholdPercent: 80,
+        },
+        current: {
+          tokens: 5000,
+          costUsd: 0.25,
+          turns: 10,
+        },
+        limits: {
+          tokensExceeded: false,
+          costExceeded: false,
+          turnsExceeded: false,
+        },
+      }),
+    };
+
+    (metricsModule.getMetricsService as ReturnType<typeof vi.fn>).mockReturnValue(mockMetricsService as never);
+
+    const response = await request(app).get('/usage/budget');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      budget: {
+        maxTokens: 10000,
+        maxCostUsd: 1.0,
+        maxTurns: 50,
+        warningThresholdPercent: 80,
+      },
+      current: {
+        tokens: 5000,
+        costUsd: 0.25,
+        turns: 10,
+      },
+      limits: {
+        tokensExceeded: false,
+        costExceeded: false,
+        turnsExceeded: false,
+      },
+    });
+  });
+
+  it('should return empty budget when metrics service is not available', async () => {
+    (metricsModule.getMetricsService as ReturnType<typeof vi.fn>).mockReturnValue(null);
+
+    const response = await request(app).get('/usage/budget');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      budget: null,
+      current: {
+        tokens: 0,
+        costUsd: 0,
+        turns: 0,
+      },
+      limits: {
+        tokensExceeded: false,
+        costExceeded: false,
+        turnsExceeded: false,
+      },
+    });
+  });
+});

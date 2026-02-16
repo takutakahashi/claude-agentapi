@@ -16,6 +16,9 @@ This project implements a server compatible with the [coder/agentapi](https://gi
 - ✅ **MCP (Model Context Protocol) servers support**
 - ✅ **Plugin marketplace support**
 - ✅ **Prometheus metrics export** (Claude Code compatible)
+- ✅ **Token budget management** - Control costs with configurable limits
+- ✅ **Token usage tracking** - Last call and cumulative statistics
+- ✅ **Automatic message history trimming** - Optimize memory usage
 - ✅ Server-Sent Events (SSE) for real-time updates
 - ✅ Multi-turn conversation support
 - ✅ AskUserQuestion and ExitPlanMode tool handling
@@ -543,6 +546,80 @@ Stop the currently running agent.
 
 **Note:** This action can be called at any time, regardless of agent status.
 
+### GET /usage
+Get token usage and cost statistics for the **last API call**.
+
+**Response:**
+```json
+{
+  "tokens": {
+    "input": 1000,
+    "output": 500,
+    "cacheRead": 200,
+    "cacheCreation": 100,
+    "total": 1800
+  },
+  "cost": {
+    "totalUsd": 0.05
+  },
+  "session": {
+    "id": "session-123",
+    "status": "running",
+    "messageCount": 5
+  }
+}
+```
+
+### GET /usage/cumulative
+Get **cumulative** token usage and cost statistics for the entire session.
+
+**Response:**
+```json
+{
+  "tokens": {
+    "input": 5000,
+    "output": 2500,
+    "cacheRead": 1000,
+    "cacheCreation": 500,
+    "total": 9000
+  },
+  "cost": {
+    "totalUsd": 0.25
+  },
+  "session": {
+    "id": "session-123",
+    "status": "running",
+    "messageCount": 15
+  }
+}
+```
+
+### GET /usage/budget
+Get token budget status and limits.
+
+**Response:**
+```json
+{
+  "budget": {
+    "maxTokens": 10000,
+    "maxCostUsd": 1.0,
+    "maxTurns": 50,
+    "maxMessageHistory": 100,
+    "warningThresholdPercent": 80
+  },
+  "current": {
+    "tokens": 5000,
+    "costUsd": 0.25,
+    "turns": 10
+  },
+  "limits": {
+    "tokensExceeded": false,
+    "costExceeded": false,
+    "turnsExceeded": false
+  }
+}
+```
+
 ### GET /events
 Server-Sent Events (SSE) stream for real-time updates.
 
@@ -712,6 +789,90 @@ Define custom commands that can be invoked during agent operation. Configure com
 ```
 
 Commands can be invoked by the agent or used for custom workflows within your application.
+
+## Token Budget Management
+
+This server provides comprehensive token budget management to help you control costs and optimize resource usage. The implementation is inspired by [anomalyco/opencode](https://github.com/anomalyco/opencode)'s token management features.
+
+### Features
+
+- **Dual Token Tracking**: Track both last API call and cumulative usage
+- **Budget Limits**: Set limits on tokens, cost (USD), and conversation turns
+- **Automatic Warnings**: Get warned when approaching budget limits
+- **Message History Management**: Automatic trimming based on configured limits
+- **Real-time Monitoring**: Track usage via REST API endpoints
+
+### Configuration
+
+Configure token budget limits using environment variables:
+
+```bash
+# Maximum total tokens allowed (input + output + cache)
+TOKEN_BUDGET_MAX_TOKENS=1000000
+
+# Maximum cost in USD
+TOKEN_BUDGET_MAX_COST_USD=10.0
+
+# Maximum number of conversation turns (API calls)
+TOKEN_BUDGET_MAX_TURNS=100
+
+# Maximum message history length (for automatic trimming)
+MAX_MESSAGE_HISTORY=100
+
+# Warning threshold as percentage of budget (0-100)
+# When usage reaches this percentage, a warning will be logged
+TOKEN_BUDGET_WARNING_THRESHOLD=80
+```
+
+### Usage Tracking Endpoints
+
+Three endpoints are available for monitoring token usage:
+
+1. **`GET /usage`** - Returns token usage for the **last API call**
+2. **`GET /usage/cumulative`** - Returns **cumulative** usage across all API calls
+3. **`GET /usage/budget`** - Returns budget status and limits
+
+Example response from `/usage/budget`:
+
+```json
+{
+  "budget": {
+    "maxTokens": 1000000,
+    "maxCostUsd": 10.0,
+    "maxTurns": 100,
+    "warningThresholdPercent": 80
+  },
+  "current": {
+    "tokens": 450000,
+    "costUsd": 4.2,
+    "turns": 42
+  },
+  "limits": {
+    "tokensExceeded": false,
+    "costExceeded": false,
+    "turnsExceeded": false
+  }
+}
+```
+
+### Automatic Budget Warnings
+
+When you approach or exceed budget limits, warnings will be logged:
+
+```
+[WARN] Token budget warning: 820000/1000000 tokens (82.0%)
+[WARN] Cost budget exceeded: $10.15/$10.00 (101.5%)
+[WARN] Turn limit reached: 100/100 turns
+```
+
+### Message History Optimization
+
+To optimize memory usage and token consumption, the server automatically trims message history when it exceeds the configured limit. This can be controlled via:
+
+- Environment variable: `MAX_MESSAGE_HISTORY=100`
+- Token budget config: `TOKEN_BUDGET_MAX_MESSAGE_HISTORY` (takes precedence)
+
+When trimming occurs, the oldest messages are removed while preserving recent conversation context.
 
 ## Prometheus Metrics
 

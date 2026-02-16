@@ -9,7 +9,8 @@ import { createWriteStream, type WriteStream } from 'fs';
 import { dirname } from 'path';
 import { mkdir } from 'fs/promises';
 
-const MAX_MESSAGE_HISTORY = parseInt(process.env.MAX_MESSAGE_HISTORY || '100000', 10);
+// Default max message history (can be overridden by token budget config)
+const DEFAULT_MAX_MESSAGE_HISTORY = parseInt(process.env.MAX_MESSAGE_HISTORY || '100000', 10);
 
 // Helper class to manage streaming input
 class InputStreamManager {
@@ -53,6 +54,7 @@ export class AgentService {
   private pendingPlanInput: unknown | null = null;
   private pendingPlanResolve: ((value: boolean) => void) | null = null;
   private outputFileStream: WriteStream | null = null;
+  private maxMessageHistory: number = DEFAULT_MAX_MESSAGE_HISTORY;
 
   async initialize(): Promise<void> {
     try {
@@ -77,6 +79,12 @@ export class AgentService {
 
       // Resolve configuration from .claude/config.json and environment variables
       const config = await resolveConfig();
+
+      // Set max message history from token budget config if available
+      if (config.tokenBudget?.maxMessageHistory) {
+        this.maxMessageHistory = config.tokenBudget.maxMessageHistory;
+        logger.info(`Max message history set to: ${this.maxMessageHistory}`);
+      }
 
       const model = process.env.ANTHROPIC_MODEL || 'default';
 
@@ -1014,9 +1022,10 @@ export class AgentService {
     this.messages.push(message);
 
     // Trim message history if it exceeds the limit
-    if (this.messages.length > MAX_MESSAGE_HISTORY) {
-      this.messages = this.messages.slice(-MAX_MESSAGE_HISTORY);
-      logger.debug(`Message history trimmed to ${MAX_MESSAGE_HISTORY} messages`);
+    if (this.messages.length > this.maxMessageHistory) {
+      const trimmedCount = this.messages.length - this.maxMessageHistory;
+      this.messages = this.messages.slice(-this.maxMessageHistory);
+      logger.info(`Message history trimmed: removed ${trimmedCount} old messages (limit: ${this.maxMessageHistory})`);
     }
 
     return message;
