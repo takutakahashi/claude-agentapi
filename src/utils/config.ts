@@ -278,6 +278,15 @@ async function resolvePluginsFromSettings(settings: ClaudeSettings | null): Prom
  * Resolve final configuration with environment variable overrides
  */
 export async function resolveConfig(): Promise<ResolvedConfig> {
+  // Set default CLAUDE_AUTOCOMPACT_PCT_OVERRIDE if not already set
+  // Default to 80% (SDK default is 95%, but we use 80% as a more conservative default)
+  if (!process.env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE) {
+    process.env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE = '80';
+    logger.info('Setting default CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=80');
+  } else {
+    logger.info(`Using CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=${process.env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE}`);
+  }
+
   // Get working directory from env or default to current directory
   const workingDirectory = process.env.CLAUDE_WORKING_DIRECTORY || process.cwd();
 
