@@ -26,6 +26,13 @@ export class MetricsService {
   private sessionStartTime: number = 0;
   private lastActivityTime: number = 0;
 
+  // Usage tracking
+  private totalInputTokens: number = 0;
+  private totalOutputTokens: number = 0;
+  private totalCacheReadTokens: number = 0;
+  private totalCacheCreationTokens: number = 0;
+  private totalCostUsd: number = 0;
+
   constructor(sessionId: string) {
     this.sessionId = sessionId;
     this.initializeMetrics();
@@ -159,15 +166,20 @@ export class MetricsService {
    * Record cost
    */
   recordCost(costUsd: number, model: string): void {
-    if (!this.costCounter) return;
+    // Always track locally
+    this.totalCostUsd += costUsd;
 
-    const attrs = {
-      ...this.getStandardAttributes(),
-      model,
-    };
+    // Send to metrics if available
+    if (this.costCounter) {
+      const attrs = {
+        ...this.getStandardAttributes(),
+        model,
+      };
 
-    this.costCounter.add(costUsd, attrs);
-    this.updateActivity();
+      this.costCounter.add(costUsd, attrs);
+      this.updateActivity();
+    }
+
     logger.debug(`Recorded cost: $${costUsd} for model ${model}`);
   }
 
@@ -180,30 +192,49 @@ export class MetricsService {
     cacheRead?: number;
     cacheCreation?: number;
   }, model: string): void {
-    if (!this.tokenCounter) return;
-
-    const baseAttrs = {
-      ...this.getStandardAttributes(),
-      model,
-    };
-
+    // Always track locally
     if (tokens.input) {
-      this.tokenCounter.add(tokens.input, { ...baseAttrs, type: 'input' });
+      this.totalInputTokens += tokens.input;
     }
 
     if (tokens.output) {
-      this.tokenCounter.add(tokens.output, { ...baseAttrs, type: 'output' });
+      this.totalOutputTokens += tokens.output;
     }
 
     if (tokens.cacheRead) {
-      this.tokenCounter.add(tokens.cacheRead, { ...baseAttrs, type: 'cacheRead' });
+      this.totalCacheReadTokens += tokens.cacheRead;
     }
 
     if (tokens.cacheCreation) {
-      this.tokenCounter.add(tokens.cacheCreation, { ...baseAttrs, type: 'cacheCreation' });
+      this.totalCacheCreationTokens += tokens.cacheCreation;
     }
 
-    this.updateActivity();
+    // Send to metrics if available
+    if (this.tokenCounter) {
+      const baseAttrs = {
+        ...this.getStandardAttributes(),
+        model,
+      };
+
+      if (tokens.input) {
+        this.tokenCounter.add(tokens.input, { ...baseAttrs, type: 'input' });
+      }
+
+      if (tokens.output) {
+        this.tokenCounter.add(tokens.output, { ...baseAttrs, type: 'output' });
+      }
+
+      if (tokens.cacheRead) {
+        this.tokenCounter.add(tokens.cacheRead, { ...baseAttrs, type: 'cacheRead' });
+      }
+
+      if (tokens.cacheCreation) {
+        this.tokenCounter.add(tokens.cacheCreation, { ...baseAttrs, type: 'cacheCreation' });
+      }
+
+      this.updateActivity();
+    }
+
     logger.debug(`Recorded token usage for model ${model}`);
   }
 
@@ -241,6 +272,37 @@ export class MetricsService {
     const activeTimeSeconds = (this.lastActivityTime - this.sessionStartTime) / 1000;
     this.activeTimeHistogram.record(activeTimeSeconds, this.getStandardAttributes());
     logger.debug(`Recorded active time: ${activeTimeSeconds}s`);
+  }
+
+  /**
+   * Get current usage statistics
+   */
+  getUsageStats(): {
+    sessionId: string;
+    tokens: {
+      input: number;
+      output: number;
+      cacheRead: number;
+      cacheCreation: number;
+      total: number;
+    };
+    cost: {
+      totalUsd: number;
+    };
+  } {
+    return {
+      sessionId: this.sessionId,
+      tokens: {
+        input: this.totalInputTokens,
+        output: this.totalOutputTokens,
+        cacheRead: this.totalCacheReadTokens,
+        cacheCreation: this.totalCacheCreationTokens,
+        total: this.totalInputTokens + this.totalOutputTokens + this.totalCacheReadTokens + this.totalCacheCreationTokens,
+      },
+      cost: {
+        totalUsd: this.totalCostUsd,
+      },
+    };
   }
 }
 
