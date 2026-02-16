@@ -22,8 +22,8 @@ describe('MetricsService', () => {
   });
 
   describe('getUsageStats', () => {
-    it('should return initial zero stats', () => {
-      const stats = metricsService.getUsageStats();
+    it('should return initial zero stats', async () => {
+      const stats = await metricsService.getUsageStats();
 
       expect(stats).toEqual({
         sessionId: 'test-session-123',
@@ -40,7 +40,7 @@ describe('MetricsService', () => {
       });
     });
 
-    it('should return last API call usage (not cumulative)', () => {
+    it('should return last API call usage (not cumulative)', async () => {
       // First API call
       metricsService.recordTokenUsage({
         input: 100,
@@ -55,7 +55,7 @@ describe('MetricsService', () => {
         cacheCreation: 25,
       }, 'test-model');
 
-      const stats = metricsService.getUsageStats();
+      const stats = await metricsService.getUsageStats();
 
       // Should return only the last API call's usage
       expect(stats.tokens.input).toBe(200);
@@ -65,17 +65,17 @@ describe('MetricsService', () => {
       expect(stats.tokens.total).toBe(425);
     });
 
-    it('should return last API call cost (not cumulative)', () => {
+    it('should return last API call cost (not cumulative)', async () => {
       metricsService.recordCost(0.05, 'model-1');
       metricsService.recordCost(0.03, 'model-2'); // This is what should be returned
 
-      const stats = metricsService.getUsageStats();
+      const stats = await metricsService.getUsageStats();
 
       // Should return only the last API call's cost
       expect(stats.cost.totalUsd).toBe(0.03);
     });
 
-    it('should return last API call for both tokens and cost', () => {
+    it('should return last API call for both tokens and cost', async () => {
       metricsService.recordTokenUsage({
         input: 1000,
         output: 500,
@@ -90,7 +90,7 @@ describe('MetricsService', () => {
         cacheRead: 200,
       }, 'test-model');
 
-      const stats = metricsService.getUsageStats();
+      const stats = await metricsService.getUsageStats();
 
       // Should return only the last API call's usage
       expect(stats.tokens.input).toBe(50);
