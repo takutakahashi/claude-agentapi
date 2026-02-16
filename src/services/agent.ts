@@ -53,22 +53,6 @@ export class AgentService {
   private pendingPlanInput: unknown | null = null;
   private pendingPlanResolve: ((value: boolean) => void) | null = null;
   private outputFileStream: WriteStream | null = null;
-  private latestUsage: {
-    usage?: {
-      input_tokens?: number;
-      output_tokens?: number;
-      cache_read_input_tokens?: number;
-      cache_creation_input_tokens?: number;
-    };
-    cost_usd?: number;
-    model_usage?: Record<string, {
-      input_tokens?: number;
-      output_tokens?: number;
-      cache_read_input_tokens?: number;
-      cache_creation_input_tokens?: number;
-      cost_usd?: number;
-    }>;
-  } | null = null;
 
   async initialize(): Promise<void> {
     try {
@@ -555,22 +539,9 @@ export class AgentService {
           if (textBlocks.length > 0) {
             const text = textBlocks.map((block: { type: 'text'; text: string }) => block.text).join('\n');
             if (text.trim()) {
-              // Add usage information if available
-              const usageOptions = this.latestUsage ? {
-                usage: this.latestUsage.usage,
-                cost_usd: this.latestUsage.cost_usd,
-                model_usage: this.latestUsage.model_usage,
-              } : undefined;
-
-              const assistantMessage = this.addMessage('assistant', text, undefined, usageOptions);
+              const assistantMessage = this.addMessage('assistant', text);
               sessionService.broadcastMessageUpdate(assistantMessage);
-              logger.debug('Assistant text message broadcasted', {
-                message_id: assistantMessage.id,
-                has_usage: !!usageOptions,
-              });
-
-              // Clear usage after attaching to message
-              this.latestUsage = null;
+              logger.debug('Assistant text message broadcasted', { message_id: assistantMessage.id });
             }
           }
 
@@ -698,7 +669,7 @@ export class AgentService {
           throw userError;
         }
       } else if (msg.type === 'result') {
-        // Store usage information from result message
+        // Extract usage information from result message
         const usage = 'usage' in msg && typeof msg.usage === 'object' && msg.usage !== null
           ? msg.usage as {
               input_tokens?: number;
@@ -736,11 +707,29 @@ export class AgentService {
           ])
         ) : undefined;
 
-        this.latestUsage = {
-          usage,
-          cost_usd,
-          model_usage: converted_model_usage,
-        };
+        // Find the last assistant message and add usage information to it
+        if (usage || cost_usd || converted_model_usage) {
+          // Search backwards for the most recent assistant message
+          for (let i = this.messages.length - 1; i >= 0; i--) {
+            if (this.messages[i].role === 'assistant') {
+              // Update the message with usage information
+              this.messages[i].usage = usage;
+              this.messages[i].cost_usd = cost_usd;
+              this.messages[i].model_usage = converted_model_usage;
+
+              // Broadcast the updated message
+              sessionService.broadcastMessageUpdate(this.messages[i]);
+
+              logger.debug('Added usage information to assistant message', {
+                message_id: this.messages[i].id,
+                has_usage: !!usage,
+                has_cost: !!cost_usd,
+                has_model_usage: !!converted_model_usage,
+              });
+              break;
+            }
+          }
+        }
 
         // Query completed
         if (msg.subtype === 'success') {
