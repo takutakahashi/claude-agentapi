@@ -26,12 +26,19 @@ export class MetricsService {
   private sessionStartTime: number = 0;
   private lastActivityTime: number = 0;
 
-  // Usage tracking
+  // Usage tracking (cumulative for metrics)
   private totalInputTokens: number = 0;
   private totalOutputTokens: number = 0;
   private totalCacheReadTokens: number = 0;
   private totalCacheCreationTokens: number = 0;
   private totalCostUsd: number = 0;
+
+  // Last usage from most recent API call (for /usage endpoint)
+  private lastInputTokens: number = 0;
+  private lastOutputTokens: number = 0;
+  private lastCacheReadTokens: number = 0;
+  private lastCacheCreationTokens: number = 0;
+  private lastCostUsd: number = 0;
 
   constructor(sessionId: string) {
     this.sessionId = sessionId;
@@ -166,7 +173,10 @@ export class MetricsService {
    * Record cost
    */
   recordCost(costUsd: number, model: string): void {
-    // Always track locally
+    // Store last usage for /usage endpoint
+    this.lastCostUsd = costUsd;
+
+    // Accumulate for cumulative metrics
     this.totalCostUsd += costUsd;
 
     // Send to metrics if available
@@ -192,7 +202,13 @@ export class MetricsService {
     cacheRead?: number;
     cacheCreation?: number;
   }, model: string): void {
-    // Always track locally
+    // Store last usage for /usage endpoint
+    this.lastInputTokens = tokens.input || 0;
+    this.lastOutputTokens = tokens.output || 0;
+    this.lastCacheReadTokens = tokens.cacheRead || 0;
+    this.lastCacheCreationTokens = tokens.cacheCreation || 0;
+
+    // Accumulate for cumulative metrics
     if (tokens.input) {
       this.totalInputTokens += tokens.input;
     }
@@ -275,7 +291,7 @@ export class MetricsService {
   }
 
   /**
-   * Get current usage statistics
+   * Get current usage statistics (returns last API call usage, not cumulative)
    */
   getUsageStats(): {
     sessionId: string;
@@ -293,14 +309,14 @@ export class MetricsService {
     return {
       sessionId: this.sessionId,
       tokens: {
-        input: this.totalInputTokens,
-        output: this.totalOutputTokens,
-        cacheRead: this.totalCacheReadTokens,
-        cacheCreation: this.totalCacheCreationTokens,
-        total: this.totalInputTokens + this.totalOutputTokens + this.totalCacheReadTokens + this.totalCacheCreationTokens,
+        input: this.lastInputTokens,
+        output: this.lastOutputTokens,
+        cacheRead: this.lastCacheReadTokens,
+        cacheCreation: this.lastCacheCreationTokens,
+        total: this.lastInputTokens + this.lastOutputTokens + this.lastCacheReadTokens + this.lastCacheCreationTokens,
       },
       cost: {
-        totalUsd: this.totalCostUsd,
+        totalUsd: this.lastCostUsd,
       },
     };
   }

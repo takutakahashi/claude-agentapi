@@ -40,13 +40,14 @@ describe('MetricsService', () => {
       });
     });
 
-    it('should track token usage correctly', () => {
-      // Record some token usage
+    it('should return last API call usage (not cumulative)', () => {
+      // First API call
       metricsService.recordTokenUsage({
         input: 100,
         output: 50,
       }, 'test-model');
 
+      // Second API call (this is what should be returned)
       metricsService.recordTokenUsage({
         input: 200,
         output: 150,
@@ -56,23 +57,25 @@ describe('MetricsService', () => {
 
       const stats = metricsService.getUsageStats();
 
-      expect(stats.tokens.input).toBe(300);
-      expect(stats.tokens.output).toBe(200);
+      // Should return only the last API call's usage
+      expect(stats.tokens.input).toBe(200);
+      expect(stats.tokens.output).toBe(150);
       expect(stats.tokens.cacheRead).toBe(50);
       expect(stats.tokens.cacheCreation).toBe(25);
-      expect(stats.tokens.total).toBe(575);
+      expect(stats.tokens.total).toBe(425);
     });
 
-    it('should track cost correctly', () => {
+    it('should return last API call cost (not cumulative)', () => {
       metricsService.recordCost(0.05, 'model-1');
-      metricsService.recordCost(0.03, 'model-2');
+      metricsService.recordCost(0.03, 'model-2'); // This is what should be returned
 
       const stats = metricsService.getUsageStats();
 
-      expect(stats.cost.totalUsd).toBe(0.08);
+      // Should return only the last API call's cost
+      expect(stats.cost.totalUsd).toBe(0.03);
     });
 
-    it('should track both tokens and cost together', () => {
+    it('should return last API call for both tokens and cost', () => {
       metricsService.recordTokenUsage({
         input: 1000,
         output: 500,
@@ -80,17 +83,21 @@ describe('MetricsService', () => {
 
       metricsService.recordCost(0.1, 'test-model');
 
+      // Last API call with different usage
       metricsService.recordTokenUsage({
+        input: 50,
+        output: 30,
         cacheRead: 200,
       }, 'test-model');
 
       const stats = metricsService.getUsageStats();
 
-      expect(stats.tokens.input).toBe(1000);
-      expect(stats.tokens.output).toBe(500);
+      // Should return only the last API call's usage
+      expect(stats.tokens.input).toBe(50);
+      expect(stats.tokens.output).toBe(30);
       expect(stats.tokens.cacheRead).toBe(200);
-      expect(stats.tokens.total).toBe(1700);
-      expect(stats.cost.totalUsd).toBe(0.1);
+      expect(stats.tokens.total).toBe(280);
+      expect(stats.cost.totalUsd).toBe(0.1); // Last recorded cost
     });
   });
 });
