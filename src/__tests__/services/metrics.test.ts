@@ -40,13 +40,15 @@ describe('MetricsService', () => {
       });
     });
 
-    it('should track token usage correctly', () => {
-      // Record some token usage
+    it('should track token usage correctly with cumulative values from SDK', () => {
+      // Record cumulative token usage (as SDK provides)
+      // First result message with cumulative usage
       metricsService.recordTokenUsage({
         input: 100,
         output: 50,
       }, 'test-model');
 
+      // Second result message with updated cumulative usage
       metricsService.recordTokenUsage({
         input: 200,
         output: 150,
@@ -56,23 +58,27 @@ describe('MetricsService', () => {
 
       const stats = metricsService.getUsageStats();
 
-      expect(stats.tokens.input).toBe(300);
-      expect(stats.tokens.output).toBe(200);
+      // Since SDK provides cumulative values, the latest values should be stored
+      expect(stats.tokens.input).toBe(200);
+      expect(stats.tokens.output).toBe(150);
       expect(stats.tokens.cacheRead).toBe(50);
       expect(stats.tokens.cacheCreation).toBe(25);
-      expect(stats.tokens.total).toBe(575);
+      expect(stats.tokens.total).toBe(425);
     });
 
-    it('should track cost correctly', () => {
+    it('should track cost correctly with cumulative values from SDK', () => {
+      // SDK provides cumulative cost in result messages
       metricsService.recordCost(0.05, 'model-1');
-      metricsService.recordCost(0.03, 'model-2');
+      metricsService.recordCost(0.08, 'model-1'); // Updated cumulative cost
 
       const stats = metricsService.getUsageStats();
 
+      // Latest cumulative cost should be stored
       expect(stats.cost.totalUsd).toBe(0.08);
     });
 
-    it('should track both tokens and cost together', () => {
+    it('should track both tokens and cost together with cumulative values', () => {
+      // First result message
       metricsService.recordTokenUsage({
         input: 1000,
         output: 500,
@@ -80,7 +86,10 @@ describe('MetricsService', () => {
 
       metricsService.recordCost(0.1, 'test-model');
 
+      // Second result message with updated cumulative values
       metricsService.recordTokenUsage({
+        input: 1000,
+        output: 500,
         cacheRead: 200,
       }, 'test-model');
 

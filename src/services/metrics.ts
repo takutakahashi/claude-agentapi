@@ -26,12 +26,19 @@ export class MetricsService {
   private sessionStartTime: number = 0;
   private lastActivityTime: number = 0;
 
-  // Usage tracking
+  // Usage tracking (cumulative values from SDK)
   private totalInputTokens: number = 0;
   private totalOutputTokens: number = 0;
   private totalCacheReadTokens: number = 0;
   private totalCacheCreationTokens: number = 0;
   private totalCostUsd: number = 0;
+
+  // Previous values for calculating deltas (for OpenTelemetry counters)
+  private prevInputTokens: number = 0;
+  private prevOutputTokens: number = 0;
+  private prevCacheReadTokens: number = 0;
+  private prevCacheCreationTokens: number = 0;
+  private prevCostUsd: number = 0;
 
   constructor(sessionId: string) {
     this.sessionId = sessionId;
@@ -164,27 +171,35 @@ export class MetricsService {
 
   /**
    * Record cost
+   * Note: SDK result messages contain cumulative cost across the entire session,
+   * so we assign rather than accumulate to avoid double-counting.
    */
   recordCost(costUsd: number, model: string): void {
-    // Always track locally
-    this.totalCostUsd += costUsd;
+    // Calculate delta from previous value
+    const deltaCost = costUsd - this.prevCostUsd;
 
-    // Send to metrics if available
-    if (this.costCounter) {
+    // Update cumulative cost
+    this.totalCostUsd = costUsd;
+    this.prevCostUsd = costUsd;
+
+    // Send delta to metrics if available
+    if (this.costCounter && deltaCost > 0) {
       const attrs = {
         ...this.getStandardAttributes(),
         model,
       };
 
-      this.costCounter.add(costUsd, attrs);
+      this.costCounter.add(deltaCost, attrs);
       this.updateActivity();
     }
 
-    logger.debug(`Recorded cost: $${costUsd} for model ${model}`);
+    logger.debug(`Recorded cost: $${costUsd} (delta: $${deltaCost}) for model ${model}`);
   }
 
   /**
    * Record token usage
+   * Note: SDK result messages contain cumulative usage across the entire session,
+   * so we assign rather than accumulate to avoid double-counting.
    */
   recordTokenUsage(tokens: {
     input?: number;
@@ -192,50 +207,60 @@ export class MetricsService {
     cacheRead?: number;
     cacheCreation?: number;
   }, model: string): void {
-    // Always track locally
-    if (tokens.input) {
-      this.totalInputTokens += tokens.input;
+    // Calculate deltas from previous values
+    const deltaInput = (tokens.input ?? this.totalInputTokens) - this.prevInputTokens;
+    const deltaOutput = (tokens.output ?? this.totalOutputTokens) - this.prevOutputTokens;
+    const deltaCacheRead = (tokens.cacheRead ?? this.totalCacheReadTokens) - this.prevCacheReadTokens;
+    const deltaCacheCreation = (tokens.cacheCreation ?? this.totalCacheCreationTokens) - this.prevCacheCreationTokens;
+
+    // Update cumulative values
+    if (tokens.input !== undefined) {
+      this.totalInputTokens = tokens.input;
+      this.prevInputTokens = tokens.input;
     }
 
-    if (tokens.output) {
-      this.totalOutputTokens += tokens.output;
+    if (tokens.output !== undefined) {
+      this.totalOutputTokens = tokens.output;
+      this.prevOutputTokens = tokens.output;
     }
 
-    if (tokens.cacheRead) {
-      this.totalCacheReadTokens += tokens.cacheRead;
+    if (tokens.cacheRead !== undefined) {
+      this.totalCacheReadTokens = tokens.cacheRead;
+      this.prevCacheReadTokens = tokens.cacheRead;
     }
 
-    if (tokens.cacheCreation) {
-      this.totalCacheCreationTokens += tokens.cacheCreation;
+    if (tokens.cacheCreation !== undefined) {
+      this.totalCacheCreationTokens = tokens.cacheCreation;
+      this.prevCacheCreationTokens = tokens.cacheCreation;
     }
 
-    // Send to metrics if available
+    // Send deltas to metrics if available
     if (this.tokenCounter) {
       const baseAttrs = {
         ...this.getStandardAttributes(),
         model,
       };
 
-      if (tokens.input) {
-        this.tokenCounter.add(tokens.input, { ...baseAttrs, type: 'input' });
+      if (deltaInput > 0) {
+        this.tokenCounter.add(deltaInput, { ...baseAttrs, type: 'input' });
       }
 
-      if (tokens.output) {
-        this.tokenCounter.add(tokens.output, { ...baseAttrs, type: 'output' });
+      if (deltaOutput > 0) {
+        this.tokenCounter.add(deltaOutput, { ...baseAttrs, type: 'output' });
       }
 
-      if (tokens.cacheRead) {
-        this.tokenCounter.add(tokens.cacheRead, { ...baseAttrs, type: 'cacheRead' });
+      if (deltaCacheRead > 0) {
+        this.tokenCounter.add(deltaCacheRead, { ...baseAttrs, type: 'cacheRead' });
       }
 
-      if (tokens.cacheCreation) {
-        this.tokenCounter.add(tokens.cacheCreation, { ...baseAttrs, type: 'cacheCreation' });
+      if (deltaCacheCreation > 0) {
+        this.tokenCounter.add(deltaCacheCreation, { ...baseAttrs, type: 'cacheCreation' });
       }
 
       this.updateActivity();
     }
 
-    logger.debug(`Recorded token usage for model ${model}`);
+    logger.debug(`Recorded token usage for model ${model} (deltas: input=${deltaInput}, output=${deltaOutput})`);
   }
 
   /**
