@@ -147,14 +147,6 @@ function mergeConfigs(configs: ClaudeConfig[]): ClaudeConfig {
       };
     }
 
-    // Merge commands
-    if (config.commands) {
-      merged.commands = {
-        ...merged.commands,
-        ...config.commands,
-      };
-    }
-
     // Merge allowedTools (concatenate arrays)
     if (config.allowedTools) {
       merged.allowedTools = [
@@ -337,7 +329,6 @@ export async function resolveConfig(): Promise<ResolvedConfig> {
     plugins,
     sdkPlugins: sdkPlugins.length > 0 ? sdkPlugins : undefined,
     hooks: claudeConfig.hooks,
-    commands: claudeConfig.commands,
     allowedTools: claudeConfig.allowedTools,
     env: claudeConfig.env,
     settingSources,
@@ -365,12 +356,6 @@ export async function resolveConfig(): Promise<ResolvedConfig> {
     logger.info(`  Hooks: ${Object.keys(resolved.hooks).join(', ')}`);
   } else {
     logger.info('  Hooks: none');
-  }
-
-  if (resolved.commands && Object.keys(resolved.commands).length > 0) {
-    logger.info(`  Commands: ${Object.keys(resolved.commands).join(', ')}`);
-  } else {
-    logger.info('  Commands: none');
   }
 
   return resolved;

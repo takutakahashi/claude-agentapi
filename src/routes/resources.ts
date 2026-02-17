@@ -17,7 +17,7 @@ router.get('/resources', async (_req: Request, res: Response) => {
     const config = await resolveConfig();
 
     // Get available resources
-    const resources = getAvailableResources(config);
+    const resources = await getAvailableResources(config);
 
     const response: ResourcesResponse = {
       resources,
