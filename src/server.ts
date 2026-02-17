@@ -7,7 +7,6 @@ import eventsRouter from './routes/events.js';
 import toolStatusRouter from './routes/tool_status.js';
 import actionRouter from './routes/action.js';
 import resourcesRouter from './routes/resources.js';
-import usageRouter from './routes/usage.js';
 import { logger } from './utils/logger.js';
 
 export function createServer(): Express {
@@ -36,7 +35,6 @@ export function createServer(): Express {
   app.use(toolStatusRouter);
   app.use(actionRouter);
   app.use(resourcesRouter);
-  app.use(usageRouter);
 
   // 404 handler
   app.use((_req, res) => {

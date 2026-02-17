@@ -4,7 +4,6 @@ import type { AgentStatus } from '../types/agent.js';
 import { sessionService } from './session.js';
 import { logger } from '../utils/logger.js';
 import { resolveConfig } from '../utils/config.js';
-import { getMetricsService } from './metrics.js';
 import { createWriteStream, type WriteStream } from 'fs';
 import { dirname } from 'path';
 import { mkdir } from 'fs/promises';
@@ -214,12 +213,6 @@ export class AgentService {
 
       // Start processing query responses in the background
       this.queryProcessorPromise = this.processQuery();
-
-      // Record session start in metrics
-      const metricsService = getMetricsService();
-      if (metricsService) {
-        metricsService.recordSessionStart();
-      }
 
       logger.info('Claude Agent SDK initialized successfully with v1 API');
     } catch (error) {
@@ -511,10 +504,6 @@ export class AgentService {
         }
       }
 
-      // Record metrics for result messages
-      if (msg.type === 'result') {
-        this.recordResultMetrics(msg);
-      }
 
       // Handle system messages (especially init messages for MCP server status)
       if (msg.type === 'system') {
@@ -569,9 +558,6 @@ export class AgentService {
 
               // Add to active tool executions
               this.activeToolExecutions.push(agentMessage);
-
-              // Record tool metrics
-              this.recordToolMetrics(toolUse.name, toolUse.input);
 
               // Handle special tool uses
               await this.handleToolUse(toolUse);
@@ -880,116 +866,6 @@ export class AgentService {
     return JSON.stringify(input, null, 2);
   }
 
-  private recordResultMetrics(msg: { type: 'result'; [key: string]: unknown }): void {
-    const metricsService = getMetricsService();
-    if (!metricsService) return;
-
-    try {
-      const model = process.env.ANTHROPIC_MODEL || 'default';
-
-      // Record cost if available
-      if ('total_cost_usd' in msg && typeof msg.total_cost_usd === 'number') {
-        metricsService.recordCost(msg.total_cost_usd, model);
-      }
-
-      // Record token usage if available
-      if ('usage' in msg && typeof msg.usage === 'object' && msg.usage !== null) {
-        const usage = msg.usage as {
-          input_tokens?: number;
-          output_tokens?: number;
-          cache_read_input_tokens?: number;
-          cache_creation_input_tokens?: number;
-        };
-
-        metricsService.recordTokenUsage(
-          {
-            input: usage.input_tokens,
-            output: usage.output_tokens,
-            cacheRead: usage.cache_read_input_tokens,
-            cacheCreation: usage.cache_creation_input_tokens,
-          },
-          model
-        );
-      }
-
-      // Record model usage if available
-      if ('modelUsage' in msg && typeof msg.modelUsage === 'object' && msg.modelUsage !== null) {
-        const modelUsage = msg.modelUsage as Record<string, {
-          inputTokens?: number;
-          outputTokens?: number;
-          cacheReadInputTokens?: number;
-          cacheCreationInputTokens?: number;
-          costUSD?: number;
-        }>;
-
-        for (const [modelName, usage] of Object.entries(modelUsage)) {
-          if (usage.costUSD) {
-            metricsService.recordCost(usage.costUSD, modelName);
-          }
-
-          metricsService.recordTokenUsage(
-            {
-              input: usage.inputTokens,
-              output: usage.outputTokens,
-              cacheRead: usage.cacheReadInputTokens,
-              cacheCreation: usage.cacheCreationInputTokens,
-            },
-            modelName
-          );
-        }
-      }
-    } catch (error) {
-      logger.error('Error recording result metrics:', error);
-    }
-  }
-
-  private recordToolMetrics(toolName: string, input: unknown): void {
-    const metricsService = getMetricsService();
-    if (!metricsService) return;
-
-    try {
-      // Record code edit tool usage
-      if (toolName === 'Edit' || toolName === 'Write' || toolName === 'NotebookEdit') {
-        // Extract language from file path if available
-        let language = 'unknown';
-        if (typeof input === 'object' && input !== null && 'file_path' in input) {
-          const filePath = (input as { file_path: unknown }).file_path;
-          if (typeof filePath === 'string') {
-            const ext = filePath.split('.').pop()?.toLowerCase();
-            const languageMap: Record<string, string> = {
-              'ts': 'TypeScript',
-              'js': 'JavaScript',
-              'py': 'Python',
-              'md': 'Markdown',
-              'json': 'JSON',
-              'yaml': 'YAML',
-              'yml': 'YAML',
-            };
-            language = languageMap[ext || ''] || ext || 'unknown';
-          }
-        }
-
-        // For now, we assume tools are accepted
-        // In a real implementation, this would track actual permission decisions
-        metricsService.recordCodeEditToolDecision(
-          toolName as 'Edit' | 'Write' | 'NotebookEdit',
-          'accept',
-          language
-        );
-      }
-
-      // Record lines of code for Edit and Write tools
-      if (toolName === 'Write' && typeof input === 'object' && input !== null && 'content' in input) {
-        const content = (input as { content: unknown }).content;
-        if (typeof content === 'string') {
-          const lines = content.split('\n').length;
-          metricsService.recordLinesOfCode(lines, 0);
-        }
-      }
-    } catch (error) {
-      logger.error('Error recording tool metrics:', error);
-    }
-  }
 
   private addMessage(
     role: 'user' | 'assistant' | 'agent' | 'tool_result',
@@ -1224,11 +1100,6 @@ export class AgentService {
       this.activeToolExecutions = [];
     }
 
-    // Record session end metrics
-    const metricsService = getMetricsService();
-    if (metricsService) {
-      metricsService.recordSessionEnd();
-    }
   }
 }
 
