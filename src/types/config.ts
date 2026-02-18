@@ -81,26 +81,6 @@ export interface HookConfig {
 export type HooksConfig = Record<string, HookConfig>;
 
 /**
- * Custom command configuration
- */
-export interface CommandConfig {
-  /** Command to execute */
-  command: string;
-  /** Arguments to pass to the command */
-  args?: string[];
-  /** Environment variables for the command process */
-  env?: Record<string, string>;
-  /** Description of what the command does */
-  description?: string;
-}
-
-/**
- * Commands configuration map
- * Custom commands that can be invoked (e.g., /deploy, /test)
- */
-export type CommandsConfig = Record<string, CommandConfig>;
-
-/**
  * Main Claude configuration structure
  * Compatible with Claude Code's .claude/config.json
  */
@@ -113,8 +93,6 @@ export interface ClaudeConfig {
   skills?: PluginsConfig;
   /** Hook configurations */
   hooks?: HooksConfig;
-  /** Custom command configurations */
-  commands?: CommandsConfig;
   /** Allowed tools (for MCP tool permissions) - supports wildcards like "mcp__servername__*" */
   allowedTools?: string[];
   /** Environment variables */
@@ -169,8 +147,6 @@ export interface ResolvedConfig {
   sdkPlugins?: SdkPluginConfig[];
   /** Hooks configuration */
   hooks?: HooksConfig;
-  /** Custom commands configuration */
-  commands?: CommandsConfig;
   /** Allowed tools (for MCP tool permissions) */
   allowedTools?: string[];
   /** Environment variables */

@@ -3,8 +3,6 @@ import { agentService } from '../services/agent.js';
 import { PostMessageRequestSchema } from '../types/api.js';
 import type { PostMessageResponse, ProblemJson } from '../types/api.js';
 import { logger } from '../utils/logger.js';
-import { parseCommandFromMessage, executeCommand } from '../services/command.js';
-import { resolveConfig } from '../utils/config.js';
 
 const router = Router();
 
@@ -37,39 +35,7 @@ router.post('/message', async (req, res) => {
         return res.status(409).json(error);
       }
 
-      // Check if message is a command invocation
-      const commandName = parseCommandFromMessage(content);
-      if (commandName) {
-        // Get configuration to check if command exists
-        const config = await resolveConfig();
-        const commandConfig = config.commands?.[commandName];
-
-        if (commandConfig) {
-          logger.info(`Executing command: /${commandName}`);
-          try {
-            const result = await executeCommand(commandName, commandConfig);
-
-            // Send command output as a message to the agent
-            const outputMessage = `Command /${commandName} executed:\n\nExit code: ${result.exitCode}\n\nOutput:\n${result.stdout}\n${result.stderr ? `\nErrors:\n${result.stderr}` : ''}`;
-            await agentService.sendMessage(outputMessage);
-
-            const response: PostMessageResponse = { ok: true };
-            return res.json(response);
-          } catch (error) {
-            logger.error(`Command /${commandName} failed:`, error);
-            const errorMessage = `Command /${commandName} failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-            await agentService.sendMessage(errorMessage);
-
-            const response: PostMessageResponse = { ok: true };
-            return res.json(response);
-          }
-        } else {
-          // Command not found, send as regular message to agent
-          logger.debug(`Command /${commandName} not found in configuration, sending as regular message`);
-        }
-      }
-
-      // Send message to agent (either regular message or unrecognized command)
+      // Send message to agent
       await agentService.sendMessage(content);
 
       const response: PostMessageResponse = { ok: true };

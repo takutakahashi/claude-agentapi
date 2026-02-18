@@ -1,11 +1,12 @@
 import type { Resource } from '../types/api.js';
 import type { ResolvedConfig } from '../types/config.js';
 import { logger } from '../utils/logger.js';
+import { discoverAllSlashCommands } from '../utils/slash-commands.js';
 
 /**
- * Get available resources (skills, commands, subagents) from the configuration
+ * Get available resources (skills, slash_commands, subagents) from the configuration
  */
-export function getAvailableResources(config: ResolvedConfig): Resource[] {
+export async function getAvailableResources(config: ResolvedConfig): Promise<Resource[]> {
   const resources: Resource[] = [];
 
   // Add skills/plugins
@@ -39,19 +40,19 @@ export function getAvailableResources(config: ResolvedConfig): Resource[] {
     }
   }
 
-  // Add commands
-  if (config.commands) {
-    for (const [name, commandConfig] of Object.entries(config.commands)) {
-      resources.push({
-        type: 'command',
-        name,
-        description: commandConfig.description,
-        metadata: {
-          command: commandConfig.command,
-          args: commandConfig.args,
-        },
-      });
-    }
+  // Add slash commands from plugins, project, and user directories
+  const slashCommands = await discoverAllSlashCommands(config);
+  for (const cmd of slashCommands) {
+    resources.push({
+      type: 'slash_command',
+      name: cmd.name,
+      description: cmd.description,
+      metadata: {
+        source: cmd.source,
+        ...(cmd.pluginName ? { pluginName: cmd.pluginName } : {}),
+        filePath: cmd.filePath,
+      },
+    });
   }
 
   // Add subagents (placeholder - will be populated when SDK supports subagents)
