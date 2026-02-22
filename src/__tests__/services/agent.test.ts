@@ -30,10 +30,6 @@ vi.mock('../../utils/config.js', () => ({
   }),
 }));
 
-vi.mock('../../services/metrics.js', () => ({
-  getMetricsService: vi.fn().mockReturnValue(null),
-}));
-
 // Import AgentService after mocking
 const { AgentService } = await import('../../services/agent.js');
 
